@@ -66,6 +66,7 @@ public class Alarm {
 		long wakeTime = Machine.timer().getTime() + x;
 		blockedList.add(KThread.currentThread());
 		waketimeList.add(wakeTime);
+		Machine.interrupt().disable();
 		KThread.sleep();
 	}
 
