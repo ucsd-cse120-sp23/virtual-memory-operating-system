@@ -34,6 +34,7 @@ public class Alarm {
 	 * should be run. 
 	 */
 	public void timerInterrupt() {
+		Machine.interrupt().disable();
 		int index = 0;
 		long currentTime = Machine.timer().getTime();
 		while(index < blockedList.size()){
@@ -44,7 +45,8 @@ public class Alarm {
 			}
 			else index++; 
 		}
-		KThread.yield();
+		Machine.interrupt().enable();
+		KThread.currentThread().yield();
 	}
 
 	/**
@@ -64,7 +66,7 @@ public class Alarm {
 		long wakeTime = Machine.timer().getTime() + x;
 		blockedList.add(KThread.currentThread());
 		waketimeList.add(wakeTime);
-		KThread.currentThread().sleep();
+		KThread.sleep();
 	}
 
         /**
