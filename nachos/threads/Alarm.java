@@ -1,12 +1,17 @@
 package nachos.threads;
 
 import nachos.machine.*;
+import java.util.ArrayList;
 
 /**
  * Uses the hardware timer to provide preemption, and to allow threads to sleep
  * until a certain time.
  */
 public class Alarm {
+
+	private ArrayList<KThread> blockedList = new ArrayList<KThread>();
+	private ArrayList<Long> waketimeList = new ArrayList<Long>();
+
 	/**
 	 * Allocate a new Alarm. Set the machine's timer interrupt handler to this
 	 * alarm's callback.
@@ -26,10 +31,20 @@ public class Alarm {
 	 * The timer interrupt handler. This is called by the machine's timer
 	 * periodically (approximately every 500 clock ticks). Causes the current
 	 * thread to yield, forcing a context switch if there is another thread that
-	 * should be run.
+	 * should be run. 
 	 */
 	public void timerInterrupt() {
-		KThread.currentThread().yield();
+		int index = 0;
+		long currentTime = Machine.timer().getTime();
+		while(index < blockedList.size()){
+			if(currentTime >= waketimeList.get(index)){
+				blockedList.get(index).ready();
+				blockedList.remove(index);
+				waketimeList.remove(index);
+			}
+			else index++; 
+		}
+		KThread.yield();
 	}
 
 	/**
@@ -47,8 +62,9 @@ public class Alarm {
 	public void waitUntil(long x) {
 		// for now, cheat just to get something working (busy waiting is bad)
 		long wakeTime = Machine.timer().getTime() + x;
-		while (wakeTime > Machine.timer().getTime())
-			KThread.yield();
+		blockedList.add(KThread.currentThread());
+		waketimeList.add(wakeTime);
+		KThread.currentThread().sleep();
 	}
 
         /**
@@ -63,4 +79,31 @@ public class Alarm {
         public boolean cancel(KThread thread) {
 		return false;
 	}
+
+
+
+
+	// Add Alarm testing code to the Alarm class
+
+	public static void alarmTest1() {
+		int durations[] = {1000, 10*1000, 100*1000};
+		long t0, t1;
+	
+		for (int d : durations) {
+			t0 = Machine.timer().getTime();
+			ThreadedKernel.alarm.waitUntil (d);
+			t1 = Machine.timer().getTime();
+			System.out.println ("alarmTest1: waited for " + (t1 - t0) + " ticks");
+		}
+		}
+	
+		// Implement more test methods here ...
+	
+		// Invoke Alarm.selfTest() from ThreadedKernel.selfTest()
+		public static void selfTest() {
+		alarmTest1();
+	
+		// Invoke your other test methods here ...
+		}
+		
 }
