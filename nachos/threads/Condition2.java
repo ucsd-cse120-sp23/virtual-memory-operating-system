@@ -78,7 +78,7 @@ public class Condition2 {
 	 * associated lock.  The thread will automatically reacquire
 	 * the lock before <tt>sleep()</tt> returns.
 	 */
-        public void sleepFor(long timeout) {
+    public void sleepFor(long timeout) {
 		Lib.assertTrue(conditionLock.isHeldByCurrentThread());
 		boolean intstatus = Machine.interrupt().disable();
 		conditionLock.release();
@@ -146,6 +146,7 @@ public class Condition2 {
     public static void selfTest() {
         new InterlockTest();
 		cvTest5();
+		sleepForTest1 ();
 		//cvTestNew(); This should be the true producer consumer problem as described in slides. Production and Consumption are random
 		//Currently is looping infinitely, as long as results are random, this is to be expected. 
     }
