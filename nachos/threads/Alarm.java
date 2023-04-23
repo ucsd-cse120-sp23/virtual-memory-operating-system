@@ -82,7 +82,15 @@ public class Alarm {
 	 * @param thread the thread whose timer should be cancelled.
 	 */
 	public boolean cancel(KThread thread) {
-		return false;
+		int ind = blockedList.indexOf(thread);
+		if (ind == -1) {
+			return false;
+		}
+		else {
+			blockedList.remove(ind).ready();
+			waketimeList.remove(ind);
+			return true;
+		}
 	}
 
 	// Add Alarm testing code to the Alarm class
