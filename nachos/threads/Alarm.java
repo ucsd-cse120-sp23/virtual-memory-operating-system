@@ -34,7 +34,7 @@ public class Alarm {
 	 * should be run.
 	 */
 	public void timerInterrupt() {
-		Boolean status = Machine.interrupt().disable(); //this should be a critical section
+		Machine.interrupt().disable(); //this should be a critical section
 		int index = 0;									//no interrupt within interrupt
 		long currentTime = Machine.timer().getTime(); 	//get the current time
 		while(index < blockedList.size()){				//loop through all the thread in blockedList
@@ -45,7 +45,8 @@ public class Alarm {
 			} else
 				index++;
 		}
-		Machine.interrupt().restore(status);			//enable interrupt before yielding 
+		Machine.interrupt().enable();			//enable interrupt before yielding 
+
 		KThread.yield();								//yield because timer interrupt should always try to switch running threads
 	}
 
