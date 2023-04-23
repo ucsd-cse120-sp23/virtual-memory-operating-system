@@ -31,7 +31,7 @@ public class Alarm {
 	 * The timer interrupt handler. This is called by the machine's timer
 	 * periodically (approximately every 500 clock ticks). Causes the current
 	 * thread to yield, forcing a context switch if there is another thread that
-	 * should be run. 
+	 * should be run.
 	 */
 	public void timerInterrupt() {
 		Boolean status = Machine.interrupt().disable(); //this should be a critical section
@@ -42,8 +42,8 @@ public class Alarm {
 				blockedList.get(index).ready();			//make any valid thread ready
 				blockedList.remove(index);
 				waketimeList.remove(index);
-			}
-			else index++; 
+			} else
+				index++;
 		}
 		Machine.interrupt().restore(status);			//enable interrupt before yielding 
 		KThread.yield();								//yield because timer interrupt should always try to switch running threads
@@ -70,43 +70,41 @@ public class Alarm {
 		KThread.sleep(); //sleep is in critical section?
 	}
 
-        /**
+	/**
 	 * Cancel any timer set by <i>thread</i>, effectively waking
 	 * up the thread immediately (placing it in the scheduler
-	 * ready set) and returning true.  If <i>thread</i> has no
+	 * ready set) and returning true. If <i>thread</i> has no
 	 * timer set, return false.
 	 * 
 	 * <p>
+	 * 
 	 * @param thread the thread whose timer should be cancelled.
 	 */
-        public boolean cancel(KThread thread) {
+	public boolean cancel(KThread thread) {
 		return false;
 	}
-
-
-
 
 	// Add Alarm testing code to the Alarm class
 
 	public static void alarmTest1() {
-		int durations[] = {1000, 10*1000, 100*1000};
+		int durations[] = { 1000, 10 * 1000, 100 * 1000 };
 		long t0, t1;
-	
+
 		for (int d : durations) {
 			t0 = Machine.timer().getTime();
-			ThreadedKernel.alarm.waitUntil (d);
+			ThreadedKernel.alarm.waitUntil(d);
 			t1 = Machine.timer().getTime();
-			System.out.println ("alarmTest1: waited for " + (t1 - t0) + " ticks");
+			System.out.println("alarmTest1: waited for " + (t1 - t0) + " ticks");
 		}
-		}
-	
-		// Implement more test methods here ...
-	
-		// Invoke Alarm.selfTest() from ThreadedKernel.selfTest()
-		public static void selfTest() {
+	}
+
+	// Implement more test methods here ...
+
+	// Invoke Alarm.selfTest() from ThreadedKernel.selfTest()
+	public static void selfTest() {
 		alarmTest1();
-	
+
 		// Invoke your other test methods here ...
-		}
-		
+	}
+
 }
