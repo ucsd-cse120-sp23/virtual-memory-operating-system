@@ -81,6 +81,12 @@ public class Condition2 {
 	 */
         public void sleepFor(long timeout) {
 		Lib.assertTrue(conditionLock.isHeldByCurrentThread());
+		boolean intstatus = Machine.interrupt().disable();
+		conditionLock.release();
+		ThreadedKernel.alarm.waitUntil(timeout);
+		ThreadedKernel.alarm.cancel(KThread.currentThread());
+		conditionLock.acquire();
+		Machine.interrupt().restore(intstatus);
 	}
 
         private Lock conditionLock;
@@ -138,6 +144,7 @@ public class Condition2 {
     public static void selfTest() {
         new InterlockTest();
 		cvTest5();
+		sleepForTest1();
     }
 	// Place Condition2 test code inside of the Condition2 class.
 
@@ -203,6 +210,23 @@ public class Condition2 {
         //for (int i = 0; i < 50; i++) { KThread.currentThread().yield(); }
     }
 
+	// Place sleepFor test code inside of the Condition2 class.
+
+    private static void sleepForTest1 () {
+		Lock lock = new Lock();
+		Condition2 cv = new Condition2(lock);
+	
+		lock.acquire();
+		long t0 = Machine.timer().getTime();
+		System.out.println (KThread.currentThread().getName() + " sleeping");
+		// no other thread will wake us up, so we should time out
+		cv.sleepFor(2000);
+		long t1 = Machine.timer().getTime();
+		System.out.println (KThread.currentThread().getName() +
+					" woke up, slept for " + (t1 - t0) + " ticks");
+		lock.release();
+		}
+	
 	private ArrayList<KThread> cvqueue;
 }
 
