@@ -2,6 +2,7 @@ package nachos.threads;
 
 import nachos.machine.*;
 import java.util.ArrayList;
+import java.util.InputMismatchException;
 import java.util.LinkedList;
 /**
  * An implementation of condition variables that disables interrupt()s for
@@ -22,9 +23,7 @@ public class Condition2 {
 	 */
 	public Condition2(Lock conditionLock) {
 		this.conditionLock = conditionLock;
-
-		cvqueue = new ArrayList<KThread>();
-		//cvqueue = new LinkedList<KThread>();
+		this.cvqueue = new ArrayList<KThread>();
 	}
 
 	/**
@@ -55,8 +54,8 @@ public class Condition2 {
 		if (cvqueue.size() != 0) {
 			KThread thrd = cvqueue.remove(0);
 			thrd.ready();
-			Machine.interrupt().restore(intstatus);
 		}
+		Machine.interrupt().restore(intstatus);
 	}
 
 	/**
@@ -84,6 +83,9 @@ public class Condition2 {
 	}
 
         private Lock conditionLock;
+		private ArrayList<KThread> cvqueue;
+
+
 		// Place Condition2 testing code in the Condition2 class.
 
     // Example of the "interlock" pattern where two threads strictly
@@ -112,9 +114,9 @@ public class Condition2 {
             cv = new Condition2(lock);
 
             KThread ping = new KThread(new Interlocker());
-            ping.setName("ping");
+            ping.setName("Alwin");
             KThread pong = new KThread(new Interlocker());
-            pong.setName("pong");
+            pong.setName("Low");
 
             ping.fork();
             pong.fork();
@@ -138,6 +140,8 @@ public class Condition2 {
     public static void selfTest() {
         new InterlockTest();
 		cvTest5();
+		//cvTestNew(); This should be the true producer consumer problem as described in slides. Production and Consumption are random
+		//Currently is looping infinitely, as long as results are random, this is to be expected. 
     }
 	// Place Condition2 test code inside of the Condition2 class.
 
@@ -203,6 +207,57 @@ public class Condition2 {
         //for (int i = 0; i < 50; i++) { KThread.currentThread().yield(); }
     }
 
-	private ArrayList<KThread> cvqueue;
+	public static void cvTestNew() {
+        final Lock lock = new Lock();
+        // final Condition empty = new Condition(lock);
+        final Condition2 notFull = new Condition2(lock);
+		final Condition2 notEmpty = new Condition2(lock);
+        final LinkedList<Integer> list = new LinkedList<>();
+
+        KThread consumer = new KThread( new Runnable () {
+                public void run() {
+					while(true){
+						lock.acquire();
+						while(list.isEmpty()){
+							notEmpty.sleep();
+						}
+						
+						boolean isFull = (list.size() == 10);
+						list.removeFirst();
+						System.out.println("Removed! There are " + list.size() + " items left!");
+
+						if(isFull)
+							notFull.wake();
+						lock.release();
+					}
+                }
+            });
+
+        KThread producer = new KThread( new Runnable () {
+                public void run() {
+					while(true){
+						lock.acquire();
+						while(list.size() >= 10){
+							notFull.sleep();
+						}
+
+						boolean isEmpty = (list.size() == 0);
+						list.add(1);
+						System.out.println("Produced! There are " + list.size() + " items now!");
+						if(isEmpty)
+							notEmpty.wake();
+						lock.release();
+					}
+                }
+            });
+
+        consumer.setName("Consumer");
+        producer.setName("Producer");
+        consumer.fork();
+        producer.fork();
+
+		consumer.join();
+        producer.join();
+    }
 }
 
