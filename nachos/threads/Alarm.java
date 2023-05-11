@@ -64,6 +64,9 @@ public class Alarm {
 	 */
 	public void waitUntil(long x) {
 		// for now, cheat just to get something working (busy waiting is bad)
+		if(x < 0){
+			return;
+		}
 		long wakeTime = Machine.timer().getTime() + x; //get wakeTime
 		blockedList.add(KThread.currentThread()); //add the current thread to the blocked list
 		waketimeList.add(wakeTime); 
