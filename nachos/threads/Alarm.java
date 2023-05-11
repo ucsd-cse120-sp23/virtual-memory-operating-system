@@ -85,14 +85,17 @@ public class Alarm {
 	 * @param thread the thread whose timer should be cancelled.
 	 */
 	public boolean cancel(KThread thread) {
+		boolean status = Machine.interrupt().disable();
 		int ind = blockedList.indexOf(thread);
 		if (ind == -1) {
+			Machine.interrupt().restore(status);	
 			return false;
 		}
 		else {
 			blockedList.get(ind).ready();
 			blockedList.remove(ind);
 			waketimeList.remove(ind);
+			Machine.interrupt().restore(status);	
 			return true;
 		}
 	}
