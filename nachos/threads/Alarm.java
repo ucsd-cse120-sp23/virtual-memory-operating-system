@@ -90,6 +90,7 @@ public class Alarm {
 			return false;
 		}
 		else {
+			blockedList.get(ind).ready();
 			blockedList.remove(ind);
 			waketimeList.remove(ind);
 			return true;
