@@ -386,9 +386,10 @@ public class UserProcess {
 		if (OpenFileList.size() == 16)
 			return -1;
 		
+		//get the string
 		String filename = readVirtualMemoryString(vaname, 256);
 		//check whether string is null
-		if (filename == null)
+		if (filename == null || filename == "")
 			return -1;
 
 		//creates a new file
@@ -406,6 +407,31 @@ public class UserProcess {
 		return -1;
 	}
 
+	private int handleOpen(int vaname){
+		//check table size, must be less than 16
+		if (OpenFileList.size() == 16)
+			return -1;
+		
+		//get the string
+		String filename = readVirtualMemoryString(vaname, 256);
+		//check whether string is null
+		if (filename == null || filename == "")
+			return -1;
+
+		//creates a new file
+		OpenFile file = ThreadedKernel.fileSystem.open(filename, false);
+		//checks whether string consists of unprintable characters
+		if (file == null)
+			return -1;
+
+		for (int i = 0; i < 16; i++){
+			if (OpenFileList.get(i) == null) {
+				OpenFileList.set(i, file);
+				return i;
+			}
+		}
+		return -1;
+	}
 	private static final int syscallHalt = 0, syscallExit = 1, syscallExec = 2,
 			syscallJoin = 3, syscallCreate = 4, syscallOpen = 5,
 			syscallRead = 6, syscallWrite = 7, syscallClose = 8,
@@ -480,6 +506,8 @@ public class UserProcess {
 			return handleExit(a0);
 		case syscallCreate:
 			return handleCreate(a0);
+		case syscallOpen:
+			return handleOpen(a0);
 
 		default:
 			Lib.debug(dbgProcess, "Unknown syscall " + syscall);
