@@ -383,8 +383,8 @@ public class UserProcess {
 	}
 	private int handleCreate(int vaname){
 		//check table size, must be less than 16
-		if (OpenFileList.size() == 16)
-			return -1;
+		//if (OpenFileList.size() == 16)
+		//	return -1;
 		
 		//get the string
 		String filename = readVirtualMemoryString(vaname, 256);
@@ -409,8 +409,8 @@ public class UserProcess {
 
 	private int handleOpen(int vaname){
 		//check table size, must be less than 16
-		if (OpenFileList.size() == 16)
-			return -1;
+		//if (OpenFileList.size() == 16)
+		//	return -1;
 		
 		//get the string
 		String filename = readVirtualMemoryString(vaname, 256);
@@ -432,6 +432,18 @@ public class UserProcess {
 		}
 		return -1;
 	}
+
+	private int handleClose(int descriptor){
+		if (descriptor > 15 || descript < 0)
+			return -1;
+		if (OpenFileList.get(descriptor) == null)
+			return -1;
+		OpenFileList.get(descriptor).close();
+		OpenFileList.set(descriptor, null);
+	}
+
+
+
 	private static final int syscallHalt = 0, syscallExit = 1, syscallExec = 2,
 			syscallJoin = 3, syscallCreate = 4, syscallOpen = 5,
 			syscallRead = 6, syscallWrite = 7, syscallClose = 8,
@@ -508,6 +520,8 @@ public class UserProcess {
 			return handleCreate(a0);
 		case syscallOpen:
 			return handleOpen(a0);
+		case syscallClose:
+			return handleClose(a0);
 
 		default:
 			Lib.debug(dbgProcess, "Unknown syscall " + syscall);
