@@ -6,6 +6,7 @@ import nachos.userprog.*;
 import nachos.vm.*;
 
 import java.io.EOFException;
+import java.util.ArrayList;
 
 /**
  * Encapsulates the state of a user process that is not contained in its user
@@ -373,6 +374,27 @@ public class UserProcess {
 
 		return 0;
 	}
+	private int handleCreate(int vaname){
+		//check table size, must be less than 16
+		if (OpenFileList.size() == 16)
+			return -1;
+		
+		String filename = readVirtualMemoryString(vaname, 256);
+		//check whether string is null
+		if (filename == null)
+			return -1;
+
+		//creates a new file
+		OpenFile file = ThreadedKernel.fileSystem.open(filename, true);
+		//checks whether string consists of unprintable characters
+		if (file == null)
+			return -1;
+
+		
+		
+
+		return 0;
+	}
 
 	private static final int syscallHalt = 0, syscallExit = 1, syscallExec = 2,
 			syscallJoin = 3, syscallCreate = 4, syscallOpen = 5,
@@ -446,6 +468,8 @@ public class UserProcess {
 			return handleHalt();
 		case syscallExit:
 			return handleExit(a0);
+		case syscallCreate:
+			return handleCreate();
 
 		default:
 			Lib.debug(dbgProcess, "Unknown syscall " + syscall);
@@ -504,4 +528,10 @@ public class UserProcess {
 	private static final int pageSize = Processor.pageSize;
 
 	private static final char dbgProcess = 'a';
+	
+	private ArrayList<OpenFile> OpenFileList = new ArrayList<OpenFile>();
+	for (int i = 0; i < 16; i++) {
+		OpenFileList.add(null);
+	}
+	private int openCount = 0;
 }
