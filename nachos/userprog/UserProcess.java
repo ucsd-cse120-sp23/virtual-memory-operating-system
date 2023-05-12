@@ -29,6 +29,13 @@ public class UserProcess {
 		pageTable = new TranslationEntry[numPhysPages];
 		for (int i = 0; i < numPhysPages; i++)
 			pageTable[i] = new TranslationEntry(i, i, true, false, false, false);
+
+		//OpenFileList initialize to null
+		OpenFileList.add(UserKernel.console.openForReading());
+		OpenFileList.add(UserKernel.console.openForWriting());
+		for (int i = 2; i < 16; i++) {
+			OpenFileList.add(null);
+		}
 	}
 
 	/**
@@ -390,10 +397,13 @@ public class UserProcess {
 		if (file == null)
 			return -1;
 
-		
-		
-
-		return 0;
+		for (int i = 0; i < 16; i++){
+			if (OpenFileList.get(i) == null) {
+				OpenFileList.set(i, file);
+				return i;
+			}
+		}
+		return -1;
 	}
 
 	private static final int syscallHalt = 0, syscallExit = 1, syscallExec = 2,
@@ -469,7 +479,7 @@ public class UserProcess {
 		case syscallExit:
 			return handleExit(a0);
 		case syscallCreate:
-			return handleCreate();
+			return handleCreate(a0);
 
 		default:
 			Lib.debug(dbgProcess, "Unknown syscall " + syscall);
@@ -530,8 +540,6 @@ public class UserProcess {
 	private static final char dbgProcess = 'a';
 	
 	private ArrayList<OpenFile> OpenFileList = new ArrayList<OpenFile>();
-	for (int i = 0; i < 16; i++) {
-		OpenFileList.add(null);
-	}
+
 	private int openCount = 0;
 }
