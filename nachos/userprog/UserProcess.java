@@ -468,6 +468,19 @@ public class UserProcess {
 		return bytesWrote;
 	}
 
+	private int handleUnlink(int vaname) {
+		// get the string
+		String filename = readVirtualMemoryString(vaname, 256);
+		// check whether string is null
+		if (filename == null || filename == "")
+			return -1;
+
+		bool onSuccess = FileSystem.remove(filename);
+		if (onSuccess)
+			return 0;
+		return -1;
+	}
+
 	private static final int syscallHalt = 0, syscallExit = 1, syscallExec = 2,
 			syscallJoin = 3, syscallCreate = 4, syscallOpen = 5,
 			syscallRead = 6, syscallWrite = 7, syscallClose = 8,
@@ -550,6 +563,8 @@ public class UserProcess {
 				return handleRead(a0, a1, a2);
 			case syscallWrite:
 				return handleWrite(a0, a1, a2);
+			case syscallUnlink:
+				return handleClose(a0);
 			default:
 				Lib.debug(dbgProcess, "Unknown syscall " + syscall);
 				Lib.assertNotReached("Unknown system call!");
