@@ -442,14 +442,30 @@ public class UserProcess {
 		OpenFileList.set(descriptor, null);
 	}
 
-	private int handleRead(int descriptor, byte[] buffer, int count) {
+	private int handleRead(int descriptor, int buf, int count) {
 		if (descriptor > 15 || descriptor < 0)
 			return -1;
 		OpenFile file = OpenFile.get(descriptor);
 		if (file == null)
 			return -1;
-		int bytesRead = file.read(buffer, descriptor, count);
+
+		byte[] buffer = buffer[256];
+		int bytesRead = file.read(buffer, buf, count);
+		writeVirtualMemory(buf, buffer);
 		return bytesRead;
+	}
+
+	private int handleWrite(int descriptor, int buf, int count) {
+		if (descriptor > 15 || descriptor < 0)
+			return -1;
+		OpenFile file = OpenFile.get(descriptor);
+		if (file == null)
+			return -1;
+
+		byte[] buffer = buffer[256];
+		readVirtualMemory(buf, buffer);
+		int bytesWrote = file.write(buffer, buf, count);
+		return bytesWrote;
 	}
 
 	private static final int syscallHalt = 0, syscallExit = 1, syscallExec = 2,
@@ -530,7 +546,10 @@ public class UserProcess {
 				return handleOpen(a0);
 			case syscallClose:
 				return handleClose(a0);
-			
+			case syscallRead:
+				return handleRead(a0, a1, a2);
+			case syscallWrite:
+				return handleWrite(a0, a1, a2);
 			default:
 				Lib.debug(dbgProcess, "Unknown syscall " + syscall);
 				Lib.assertNotReached("Unknown system call!");
