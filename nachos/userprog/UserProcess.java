@@ -462,13 +462,16 @@ public class UserProcess {
 		OpenFile file = OpenFileList.get(descriptor);
 		if (file == null)
 			return -1;
-		int bytesWrote = 0;
-		int pageNum = buf / 1024;
+
 		byte buffer[] = new byte[pageSize];
-		for (int i = 0; i < pageNum; i++) {
-			int length = readVirtualMemory(buf, buffer, 0, pageSize);
-			bytesWrote += file.write(buffer, 0, length);
-			buf += 1024;
+		int pageNum = count / 1024;
+		int totalBytesWrote = 0;
+		int bytesWrote = 0;
+		for (int i = 0; i <= pageNum; i++) {
+			int bytesTransferred = readVirtualMemory(buf, buffer, 0, count);
+			bytesWrote = file.write(buffer, 0, bytesTransferred);
+			totalBytesWrote += bytesWrote;
+			buf += pageSize;
 			if (bytesWrote == -1)
 				return -1;
 		}
