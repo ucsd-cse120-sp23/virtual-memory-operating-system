@@ -434,22 +434,23 @@ public class UserProcess {
 	}
 
 	private int handleClose(int descriptor) {
-		if (descriptor > 15 || descript < 0)
+		if (descriptor > 15 || descriptor < 0)
 			return -1;
 		if (OpenFileList.get(descriptor) == null)
 			return -1;
 		OpenFileList.get(descriptor).close();
 		OpenFileList.set(descriptor, null);
+		return 0;
 	}
 
 	private int handleRead(int descriptor, int buf, int count) {
 		if (descriptor > 15 || descriptor < 0)
 			return -1;
-		OpenFile file = OpenFile.get(descriptor);
+		OpenFile file = OpenFileList.get(descriptor);
 		if (file == null)
 			return -1;
 
-		byte[] buffer = buffer[256];
+		byte buffer[] = new byte[pageSize];
 		int bytesRead = file.read(buffer, buf, count);
 		writeVirtualMemory(buf, buffer);
 		return bytesRead;
@@ -458,13 +459,19 @@ public class UserProcess {
 	private int handleWrite(int descriptor, int buf, int count) {
 		if (descriptor > 15 || descriptor < 0)
 			return -1;
-		OpenFile file = OpenFile.get(descriptor);
+		OpenFile file = OpenFileList.get(descriptor);
 		if (file == null)
 			return -1;
-
-		byte[] buffer = buffer[256];
-		readVirtualMemory(buf, buffer);
-		int bytesWrote = file.write(buffer, buf, count);
+		int bytesWrote = 0;
+		int pageNum = buf / 1024;
+		byte buffer[] = new byte[pageSize];
+		for (int i = 0; i < pageNum; i++) {
+			int length = readVirtualMemory(buf, buffer, 0, pageSize);
+			bytesWrote += file.write(buffer, 0, length);
+			buf += 1024;
+			if (bytesWrote == -1)
+				return -1;
+		}
 		return bytesWrote;
 	}
 
@@ -475,7 +482,7 @@ public class UserProcess {
 		if (filename == null || filename == "")
 			return -1;
 
-		bool onSuccess = FileSystem.remove(filename);
+		Boolean onSuccess = ThreadedKernel.fileSystem.remove(filename);
 		if (onSuccess)
 			return 0;
 		return -1;
