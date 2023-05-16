@@ -451,8 +451,23 @@ public class UserProcess {
 			return -1;
 
 		byte buffer[] = new byte[pageSize];
-		int bytesRead = file.read(buffer, buf, count);
-		writeVirtualMemory(buf, buffer);
+		int remaining = count;
+		int curPageCount;
+		int totalBytesRead = 0;
+		int bytesRead = 0;
+		while(remaining > 0){
+			if(remaining > 0)
+				curPageCount = pageSize;
+			else	
+				curPageCount = remaining;
+			remaining -= pageSize;
+			bytesRead = file.read(buffer, 0, curPageCount);
+			int bytesWrote = writeVirtualMemory(buf, buffer, 0, bytesRead);
+			if (bytesWrote == -1 || bytesWrote < bytesRead)
+				return -1;
+			totalBytesRead += bytesRead;
+			buf += pageSize;
+		}
 		return bytesRead;
 	}
 
@@ -464,16 +479,22 @@ public class UserProcess {
 			return -1;
 
 		byte buffer[] = new byte[pageSize];
-		int pageNum = count / 1024;
+		int remaining = count;
+		int curPageCount;
 		int totalBytesWrote = 0;
 		int bytesWrote = 0;
-		for (int i = 0; i <= pageNum; i++) {
-			int bytesTransferred = readVirtualMemory(buf, buffer, 0, count);
-			bytesWrote = file.write(buffer, 0, bytesTransferred);
+		while(remaining > 0 ){
+			if(remaining >= pageSize)
+				curPageCount = pageSize;
+			else
+				curPageCount = remaining;
+			remaining -= pageSize;
+			int bytesRead = readVirtualMemory(buf, buffer, 0, curPageCount);
+			bytesWrote = file.write(buffer, 0, bytesRead);
+			if (bytesWrote == -1 || bytesWrote < bytesRead)
+				return -1;
 			totalBytesWrote += bytesWrote;
 			buf += pageSize;
-			if (bytesWrote == -1)
-				return -1;
 		}
 		return bytesWrote;
 	}
