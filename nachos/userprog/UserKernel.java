@@ -1,5 +1,7 @@
 package nachos.userprog;
 
+import java.util.ArrayList;
+
 import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
@@ -29,6 +31,11 @@ public class UserKernel extends ThreadedKernel {
 				exceptionHandler();
 			}
 		});
+		int numPhysPages = Machine.processor().getNumPhysPages();
+		freePPNs = new ArrayList<Integer>();
+		for (int i = 0; i < numPhysPages; i++){
+			freePPNs.add(i);
+		}
 	}
 
 	/**
@@ -108,8 +115,11 @@ public class UserKernel extends ThreadedKernel {
 		    }
 
 		}
+		//unload here????????????
+		process.unloadSections();
 
 		KThread.currentThread().finish();
+
 	}
 
 	/**
@@ -119,9 +129,24 @@ public class UserKernel extends ThreadedKernel {
 		super.terminate();
 	}
 
+	public static int getNumFreePages(){
+		return freePPNs.size();
+	}
+
+	public static int getNextFreePage(){
+		return freePPNs.remove(0);
+	}
+
+	public static void addFreePage(int ppn){
+		freePPNs.add(ppn);
+	}
+
 	/** Globally accessible reference to the synchronized console. */
 	public static SynchConsole console;
 
 	// dummy variables to make javac smarter
 	private static Coff dummy1 = null;
+
+	// free
+	private static ArrayList<Integer> freePPNs;
 }

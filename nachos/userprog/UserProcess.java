@@ -27,11 +27,6 @@ public class UserProcess {
 	 * Allocate a new process.
 	 */
 	public UserProcess() {
-		int numPhysPages = Machine.processor().getNumPhysPages();
-		pageTable = new TranslationEntry[numPhysPages];
-		for (int i = 0; i < numPhysPages; i++)
-			pageTable[i] = new TranslationEntry(i, i, true, false, false, false);
-
 		// OpenFileList initialize to null
 		OpenFileList.add(UserKernel.console.openForReading());
 		OpenFileList.add(UserKernel.console.openForWriting());
@@ -276,6 +271,8 @@ public class UserProcess {
 		if (!loadSections())
 			return false;
 
+		
+			
 		// store arguments in last page
 		int entryOffset = (numPages - 1) * pageSize;
 		int stringOffset = entryOffset + args.length * 4;
@@ -304,11 +301,15 @@ public class UserProcess {
 	 * @return <tt>true</tt> if the sections were successfully loaded.
 	 */
 	protected boolean loadSections() {
-		if (numPages > Machine.processor().getNumPhysPages()) {
+		Lock lock = new Lock();
+		lock.acquire();
+		if (numPages > UserKernel.getNumFreePages()) {
 			coff.close();
 			Lib.debug(dbgProcess, "\tinsufficient physical memory");
 			return false;
 		}
+
+		pageTable = new TranslationEntry[numPages];
 
 		// load sections
 		for (int s = 0; s < coff.getNumSections(); s++) {
@@ -319,12 +320,15 @@ public class UserProcess {
 
 			for (int i = 0; i < section.getLength(); i++) {
 				int vpn = section.getFirstVPN() + i;
-
 				// for now, just assume virtual addresses=physical addresses
-				section.loadPage(i, vpn);
+				int ppn = UserKernel.getNextFreePage();
+				section.loadPage(i, ppn);
+				boolean isReadOnly = section.isReadOnly();
+				pageTable[vpn] = new TranslationEntry(vpn, ppn, true, isReadOnly, false, false); //maybe???????
 			}
-		}
 
+		}
+		lock.release();
 		return true;
 	}
 
@@ -332,6 +336,12 @@ public class UserProcess {
 	 * Release any resources allocated by <tt>loadSections()</tt>.
 	 */
 	protected void unloadSections() {
+		Lock lock = new Lock();
+		lock.acquire();
+		for(int i = 0; i < pageTable.length; i++){
+			UserKernel.addFreePage(pageTable[i].ppn);
+		}
+		lock.release();
 	}
 
 	/**
