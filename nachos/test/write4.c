@@ -23,8 +23,8 @@ main ()
     int i, n;
 
     prompt[0] = '-';
-    prompt[1] = '>';
-    prompt[2] = ' ';
+    prompt[1] = '+';
+    prompt[2] = '=';
     prompt[3] = '\0';
 
     while (1) {

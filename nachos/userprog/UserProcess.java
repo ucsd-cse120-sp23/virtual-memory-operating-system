@@ -8,6 +8,8 @@ import nachos.vm.*;
 import java.io.EOFException;
 import java.util.ArrayList;
 
+import javax.print.attribute.standard.PagesPerMinute;
+
 /**
  * Encapsulates the state of a user process that is not contained in its user
  * thread (or threads). This includes its address translation state, a file
@@ -33,6 +35,7 @@ public class UserProcess {
 		// OpenFileList initialize to null
 		OpenFileList.add(UserKernel.console.openForReading());
 		OpenFileList.add(UserKernel.console.openForWriting());
+		//OpenFileList.add(UserKernel.console.openForReading());
 		for (int i = 2; i < 16; i++) {
 			OpenFileList.add(null);
 		}
@@ -456,7 +459,8 @@ public class UserProcess {
 		int totalBytesRead = 0;
 		int bytesRead = 0;
 		while(remaining > 0){
-			if(remaining > 0)
+			
+			if(remaining > pageSize)
 				curPageCount = pageSize;
 			else	
 				curPageCount = remaining;

@@ -115,10 +115,8 @@ public class StubFileSystem implements FileSystem {
 		public int read(int pos, byte[] buf, int offset, int length) {
 			if (!open)
 				return -1;
-
 			try {
 				delay();
-
 				file.seek(pos);
 				return Math.max(0, file.read(buf, offset, length));
 			}
