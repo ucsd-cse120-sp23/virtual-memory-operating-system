@@ -153,12 +153,20 @@ public class UserProcess {
 
 		byte[] memory = Machine.processor().getMemory();
 
+		// Get VPN
+		int vpn = Processor.pageFromAddress(vaddr);
+		int vaoffset = Processor.offsetFromAddress(vaddr);
+		int ppn = pageTable[vpn].ppn;
+		int paddr = pageSize * ppn + vaoffset;
+
+
 		// for now, just assume that virtual addresses equal physical addresses
 		if (vaddr < 0 || vaddr >= memory.length)
 			return 0;
 
-		int amount = Math.min(length, memory.length - vaddr);
-		System.arraycopy(memory, vaddr, data, offset, amount);
+		//int amount = Math.min(length, memory.length - vaddr);
+		int amount = Math.min(length, pageSize - vaoffset);
+		System.arraycopy(memory, paddr, data, offset, amount);
 
 		return amount;
 	}
@@ -195,12 +203,15 @@ public class UserProcess {
 
 		byte[] memory = Machine.processor().getMemory();
 
-		// for now, just assume that virtual addresses equal physical addresses
-		if (vaddr < 0 || vaddr >= memory.length)
-			return 0;
+		// Get VPN
+		int vpn = Processor.pageFromAddress(vaddr);
+		int vaoffset = Processor.offsetFromAddress(vaddr);
+		int ppn = pageTable[vpn].ppn;
+		int paddr = pageSize * ppn + vaoffset;
 
-		int amount = Math.min(length, memory.length - vaddr);
-		System.arraycopy(data, offset, memory, vaddr, amount);
+		//int amount = Math.min(length, memory.length - vaddr);
+		int amount = Math.min(length, pageSize - vaoffset);
+		System.arraycopy(data, offset, memory, paddr, amount);
 
 		return amount;
 	}
@@ -310,8 +321,9 @@ public class UserProcess {
 		}
 
 		pageTable = new TranslationEntry[numPages];
-
+		System.out.println("Number of pages " + numPages);
 		// load sections
+		int vpn = 0;
 		for (int s = 0; s < coff.getNumSections(); s++) {
 			CoffSection section = coff.getSection(s);
 
@@ -319,14 +331,19 @@ public class UserProcess {
 					+ " section (" + section.getLength() + " pages)");
 
 			for (int i = 0; i < section.getLength(); i++) {
-				int vpn = section.getFirstVPN() + i;
+				vpn = section.getFirstVPN() + i;
 				// for now, just assume virtual addresses=physical addresses
 				int ppn = UserKernel.getNextFreePage();
 				section.loadPage(i, ppn);
 				boolean isReadOnly = section.isReadOnly();
+				
 				pageTable[vpn] = new TranslationEntry(vpn, ppn, true, isReadOnly, false, false); //maybe???????
 			}
-
+		}
+		for (int i = 0; i < 9; i++){
+			vpn = vpn + 1;
+			int ppn = UserKernel.getNextFreePage();
+			pageTable[vpn] = new TranslationEntry(vpn, ppn, true, false, false, false);
 		}
 		lock.release();
 		return true;
@@ -338,6 +355,7 @@ public class UserProcess {
 	protected void unloadSections() {
 		Lock lock = new Lock();
 		lock.acquire();
+		System.out.println(pageTable.length);
 		for(int i = 0; i < pageTable.length; i++){
 			UserKernel.addFreePage(pageTable[i].ppn);
 		}
