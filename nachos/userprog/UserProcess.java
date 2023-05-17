@@ -453,13 +453,18 @@ public class UserProcess {
 		if (file == null)
 			return -1;
 
+		if (count < 0)
+			return -1;
+
+		if (buf < 0 || buf >= numPages * pageSize)
+			return -1;
+			
 		byte buffer[] = new byte[pageSize];
 		int remaining = count;
 		int curPageCount;
 		int totalBytesRead = 0;
 		int bytesRead = 0;
 		while(remaining > 0){
-			
 			if(remaining > pageSize)
 				curPageCount = pageSize;
 			else	
@@ -469,10 +474,11 @@ public class UserProcess {
 			int bytesWrote = writeVirtualMemory(buf, buffer, 0, bytesRead);
 			if (bytesWrote == -1 || bytesWrote < bytesRead)
 				return -1;
+			
 			totalBytesRead += bytesRead;
 			buf += pageSize;
 		}
-		return bytesRead;
+		return totalBytesRead;
 	}
 
 	private int handleWrite(int descriptor, int buf, int count) {
@@ -482,12 +488,19 @@ public class UserProcess {
 		if (file == null)
 			return -1;
 
+		if (count < 0)
+			return -1; 
+
+		if (buf < 0 || buf >= numPages * pageSize)
+			return -1;
+
+	
 		byte buffer[] = new byte[pageSize];
 		int remaining = count;
 		int curPageCount;
 		int totalBytesWrote = 0;
 		int bytesWrote = 0;
-		while(remaining > 0 ){
+		while(remaining > 0){
 			if(remaining >= pageSize)
 				curPageCount = pageSize;
 			else
@@ -498,9 +511,11 @@ public class UserProcess {
 			if (bytesWrote == -1 || bytesWrote < bytesRead)
 				return -1;
 			totalBytesWrote += bytesWrote;
+			if ((buf + totalBytesWrote) >= numPages*pageSize)
+				return -1;
 			buf += pageSize;
 		}
-		return bytesWrote;
+		return totalBytesWrote;
 	}
 
 	private int handleUnlink(int vaname) {

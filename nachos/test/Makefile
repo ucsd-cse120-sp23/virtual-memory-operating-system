@@ -31,7 +31,7 @@ LIB = assert atoi printf readline stdio strncmp strcat strcmp strcpy strlen memc
 NLIB = libnachos.a
 
 # TARGETS = halt sh matmult write1
-TARGETS = halt sh matmult sort echo cat cp mv rm write4 write10
+TARGETS = halt sh matmult sort echo cat cp mv rm write4 write10 snake
 
 .SECONDARY: $(patsubst %.c,%.o,$(wildcard *.c))
 
