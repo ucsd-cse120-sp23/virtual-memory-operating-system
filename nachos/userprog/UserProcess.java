@@ -586,7 +586,11 @@ public class UserProcess {
 			arguments.add(argumentEntry);
 		}
 		
-		execute(filename, arguments);
+		UserProcess childProcess = UserProcess.newUserProcess();
+		HashMap<Integer, String> children = new HashMap<Integer, String>();
+		children.put(processID, childProcess);
+		processID++;
+		childProcess.execute(filename, arguments);
 		return 0;
 	}
 	private static final int syscallHalt = 0, syscallExit = 1, syscallExec = 2,
@@ -734,5 +738,6 @@ public class UserProcess {
 	private ArrayList<OpenFile> OpenFileList = new ArrayList<OpenFile>();
 
 	private int openCount = 0;
+
 	private static int processID = 0;
 }
