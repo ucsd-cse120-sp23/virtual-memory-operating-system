@@ -159,16 +159,15 @@ public class UserProcess {
 		int ppn = pageTable[vpn].ppn;
 		int paddr = pageSize * ppn + vaoffset;
 
-
 		// for now, just assume that virtual addresses equal physical addresses
 		if (vaddr < 0 || vaddr >= memory.length)
 			return 0;
 
 		//int amount = Math.min(length, memory.length - vaddr);
 		int amount = Math.min(length, pageSize - vaoffset);
-		System.arraycopy(memory, paddr, data, offset, amount);
+		System.arraycopy(memory, paddr, data, offset, length);
 
-		return amount;
+		return length;
 	}
 
 	/**
@@ -321,7 +320,6 @@ public class UserProcess {
 		}
 
 		pageTable = new TranslationEntry[numPages];
-		System.out.println("Number of pages " + numPages);
 		// load sections
 		int vpn = 0;
 		for (int s = 0; s < coff.getNumSections(); s++) {
@@ -355,7 +353,6 @@ public class UserProcess {
 	protected void unloadSections() {
 		Lock lock = new Lock();
 		lock.acquire();
-		System.out.println(pageTable.length);
 		for(int i = 0; i < pageTable.length; i++){
 			UserKernel.addFreePage(pageTable[i].ppn);
 		}
@@ -533,15 +530,15 @@ public class UserProcess {
 				curPageCount = pageSize;
 			else
 				curPageCount = remaining;
-			remaining -= pageSize;
-			int bytesRead = readVirtualMemory(buf, buffer, 0, curPageCount);
+			int bytesRead = readVirtualMemory(buf, buffer, 0, curPageCount); 
+			remaining -= bytesRead;
 			bytesWrote = file.write(buffer, 0, bytesRead);
 			if (bytesWrote == -1 || bytesWrote < bytesRead)
 				return -1;
 			totalBytesWrote += bytesWrote;
 			if ((buf + totalBytesWrote) >= numPages*pageSize)
 				return -1;
-			buf += pageSize;
+			buf += bytesRead;
 		}
 		return totalBytesWrote;
 	}
