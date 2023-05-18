@@ -31,7 +31,7 @@ public class UserProcess {
 		// OpenFileList initialize to null
 		OpenFileList.add(UserKernel.console.openForReading());
 		OpenFileList.add(UserKernel.console.openForWriting());
-		//OpenFileList.add(UserKernel.console.openForReading());
+		// OpenFileList.add(UserKernel.console.openForReading());
 		for (int i = 2; i < 16; i++) {
 			OpenFileList.add(null);
 		}
@@ -155,25 +155,25 @@ public class UserProcess {
 		byte[] memory = Machine.processor().getMemory();
 
 		// Get VPN
-	
+
 		// for now, just assume that virtual addresses equal physical addresses
 		if (vaddr < 0 || vaddr >= memory.length)
 			return 0;
 
 		int remaining = length;
 		int curPageCount = 0;
-		while(remaining > 0){
+		while (remaining > 0) {
 			int vpn = Processor.pageFromAddress(vaddr);
 			int vaoffset = Processor.offsetFromAddress(vaddr);
 			int ppn = pageTable[vpn].ppn;
 			int paddr = pageSize * ppn + vaoffset;
-	
-			if(remaining >= pageSize)
+
+			if (remaining >= pageSize)
 				curPageCount = pageSize;
 			else
 				curPageCount = remaining;
 
-			//int amount = Math.min(length, memory.length - vaddr);
+			// int amount = Math.min(length, memory.length - vaddr);
 			int amount = Math.min(curPageCount, pageSize - vaoffset);
 			remaining -= amount;
 			System.arraycopy(memory, paddr, data, offset, amount);
@@ -221,7 +221,7 @@ public class UserProcess {
 		int ppn = pageTable[vpn].ppn;
 		int paddr = pageSize * ppn + vaoffset;
 
-		//int amount = Math.min(length, memory.length - vaddr);
+		// int amount = Math.min(length, memory.length - vaddr);
 		int amount = Math.min(length, pageSize - vaoffset);
 		System.arraycopy(data, offset, memory, paddr, amount);
 
@@ -294,8 +294,6 @@ public class UserProcess {
 		if (!loadSections())
 			return false;
 
-		
-			
 		// store arguments in last page
 		int entryOffset = (numPages - 1) * pageSize;
 		int stringOffset = entryOffset + args.length * 4;
@@ -347,11 +345,11 @@ public class UserProcess {
 				int ppn = UserKernel.getNextFreePage();
 				section.loadPage(i, ppn);
 				boolean isReadOnly = section.isReadOnly();
-				
-				pageTable[vpn] = new TranslationEntry(vpn, ppn, true, isReadOnly, false, false); //maybe???????
+
+				pageTable[vpn] = new TranslationEntry(vpn, ppn, true, isReadOnly, false, false); // maybe???????
 			}
 		}
-		for (int i = 0; i < 9; i++){
+		for (int i = 0; i < 9; i++) {
 			vpn = vpn + 1;
 			int ppn = UserKernel.getNextFreePage();
 			pageTable[vpn] = new TranslationEntry(vpn, ppn, true, false, false, false);
@@ -366,7 +364,7 @@ public class UserProcess {
 	protected void unloadSections() {
 		Lock lock = new Lock();
 		lock.acquire();
-		for(int i = 0; i < pageTable.length; i++){
+		for (int i = 0; i < pageTable.length; i++) {
 			UserKernel.addFreePage(pageTable[i].ppn);
 		}
 		lock.release();
@@ -496,23 +494,23 @@ public class UserProcess {
 
 		if (buf < 0 || buf >= numPages * pageSize)
 			return -1;
-			
+
 		byte buffer[] = new byte[pageSize];
 		int remaining = count;
 		int curPageCount;
 		int totalBytesRead = 0;
 		int bytesRead = 0;
-		while(remaining > 0){
-			if(remaining > pageSize)
+		while (remaining > 0) {
+			if (remaining > pageSize)
 				curPageCount = pageSize;
-			else	
+			else
 				curPageCount = remaining;
 			remaining -= pageSize;
 			bytesRead = file.read(buffer, 0, curPageCount);
 			int bytesWrote = writeVirtualMemory(buf, buffer, 0, bytesRead);
 			if (bytesWrote == -1 || bytesWrote < bytesRead)
 				return -1;
-			
+
 			totalBytesRead += bytesRead;
 			buf += pageSize;
 		}
@@ -527,29 +525,28 @@ public class UserProcess {
 			return -1;
 
 		if (count < 0)
-			return -1; 
+			return -1;
 
 		if (buf < 0 || buf >= numPages * pageSize)
 			return -1;
 
-	
 		byte buffer[] = new byte[pageSize];
 		int remaining = count;
 		int curPageCount;
 		int totalBytesWrote = 0;
 		int bytesWrote = 0;
-		while(remaining > 0){
-			if(remaining >= pageSize)
+		while (remaining > 0) {
+			if (remaining >= pageSize)
 				curPageCount = pageSize;
 			else
 				curPageCount = remaining;
-			int bytesRead = readVirtualMemory(buf, buffer, 0, curPageCount); 
+			int bytesRead = readVirtualMemory(buf, buffer, 0, curPageCount);
 			remaining -= bytesRead;
 			bytesWrote = file.write(buffer, 0, bytesRead);
 			if (bytesWrote == -1 || bytesWrote < bytesRead)
 				return -1;
 			totalBytesWrote += bytesWrote;
-			if ((buf + totalBytesWrote) >= numPages*pageSize)
+			if ((buf + totalBytesWrote) >= numPages * pageSize)
 				return -1;
 			buf += bytesRead;
 		}
@@ -568,25 +565,25 @@ public class UserProcess {
 			return 0;
 		return -1;
 	}
-	
+
 	private int handleExec(int file, int argc, int argv) {
 		String filename = readVirtualMemoryString(file, 256);
-		//check if filename is a valid file with .coff extension
+		// check if filename is a valid file with .coff extension
 		if (filename == null || !filename.contains(".coff"))
 			return -1;
 
 		if (argc < 0)
 			return -1;
 
-		byte[] argumentList = new byte[256]; //SIZE OF buffer??
+		byte[] argumentList = new byte[256]; // SIZE OF buffer??
 
 		int bytesRead = readVirtualMemory(argv, argumentList);
 		String[] arguments = new String[argc];
 		for (int i = 0; i < argc; i++) {
 			String argumentEntry = readVirtualMemoryString(argumentList[i], 256);
-			arguments[i] =argumentEntry;
+			arguments[i] = argumentEntry;
 		}
-		
+
 		UserProcess childProcess = UserProcess.newUserProcess();
 		HashMap<Integer, UserProcess> children = new HashMap<Integer, UserProcess>();
 		children.put(processID, childProcess);
@@ -595,6 +592,7 @@ public class UserProcess {
 		childProcess.execute(filename, arguments);
 		return processID - 1;
 	}
+
 	private static final int syscallHalt = 0, syscallExit = 1, syscallExec = 2,
 			syscallJoin = 3, syscallCreate = 4, syscallOpen = 5,
 			syscallRead = 6, syscallWrite = 7, syscallClose = 8,
@@ -679,6 +677,8 @@ public class UserProcess {
 				return handleWrite(a0, a1, a2);
 			case syscallUnlink:
 				return handleClose(a0);
+			case syscallExec:
+				return handleExec(a1, a2, a3);
 			default:
 				Lib.debug(dbgProcess, "Unknown syscall " + syscall);
 				Lib.assertNotReached("Unknown system call!");
@@ -742,6 +742,5 @@ public class UserProcess {
 	private int openCount = 0;
 
 	private static int processID = 0;
-	private int currprocessID;
 	private UserProcess parent = null;
 }
