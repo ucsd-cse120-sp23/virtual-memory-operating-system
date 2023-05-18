@@ -155,32 +155,34 @@ public class UserProcess {
 		byte[] memory = Machine.processor().getMemory();
 
 		// Get VPN
-
-		// for now, just assume that virtual addresses equal physical addresses
-		if (vaddr < 0 || vaddr >= memory.length)
+		int maxVA = numPages * (pageSize + 1) - 1;
+		if (vaddr < 0 || vaddr >= maxVA)
 			return 0;
 
 		int remaining = length;
 		int curPageCount = 0;
-		while (remaining > 0) {
+		int totalRead = 0;
+		while(remaining > 0){
 			int vpn = Processor.pageFromAddress(vaddr);
 			int vaoffset = Processor.offsetFromAddress(vaddr);
 			int ppn = pageTable[vpn].ppn;
 			int paddr = pageSize * ppn + vaoffset;
-
-			if (remaining >= pageSize)
-				curPageCount = pageSize;
-			else
-				curPageCount = remaining;
-
-			// int amount = Math.min(length, memory.length - vaddr);
-			int amount = Math.min(curPageCount, pageSize - vaoffset);
-			remaining -= amount;
-			System.arraycopy(memory, paddr, data, offset, amount);
-
-			vaddr += amount;
+	
+			//if(remaining >= pageSize)
+				//curPageCount = pageSize;
+			//else
+				//curPageCount = remaining;
+			int spaceAvail = Math.min(length, pageSize - vaoffset);
+			int leftToRead = Math.min(spaceAvail, remaining);
+			remaining -= leftToRead;
+			System.arraycopy(memory, paddr, data, offset, leftToRead);
+			totalRead += leftToRead;
+			vaddr += leftToRead;
+			offset += leftToRead;
+			if (vaddr < 0 || vaddr >= maxVA)
+				return totalRead;
 		}
-		return length;
+		return totalRead;
 	}
 
 	/**
@@ -216,16 +218,32 @@ public class UserProcess {
 		byte[] memory = Machine.processor().getMemory();
 
 		// Get VPN
-		int vpn = Processor.pageFromAddress(vaddr);
-		int vaoffset = Processor.offsetFromAddress(vaddr);
-		int ppn = pageTable[vpn].ppn;
-		int paddr = pageSize * ppn + vaoffset;
+		int maxVA = numPages * (pageSize + 1) - 1;
+		if (vaddr < 0 || vaddr >= maxVA)
+			return 0;
 
-		// int amount = Math.min(length, memory.length - vaddr);
-		int amount = Math.min(length, pageSize - vaoffset);
-		System.arraycopy(data, offset, memory, paddr, amount);
+		int remaining = length;
+		int curPageCount = 0;
+		int totalWrote = 0;
 
-		return amount;
+		while(remaining > 0){
+			int vpn = Processor.pageFromAddress(vaddr);
+			int vaoffset = Processor.offsetFromAddress(vaddr);
+			int ppn = pageTable[vpn].ppn;
+			int paddr = pageSize * ppn + vaoffset;
+
+			int spaceAvail = Math.min(length, pageSize - vaoffset);
+			int leftToWrite = Math.min(spaceAvail, remaining);
+			remaining -= leftToWrite;
+			System.arraycopy(data, offset, memory, paddr, leftToWrite);	
+			totalWrote += leftToWrite;
+			offset += leftToWrite;
+			vaddr += leftToWrite;
+			
+			if (vaddr < 0 || vaddr >= maxVA)
+				return totalWrote;
+		}
+		return totalWrote;
 	}
 
 	/**
@@ -522,12 +540,13 @@ public class UserProcess {
 				curPageCount = remaining;
 			remaining -= pageSize;
 			bytesRead = file.read(buffer, 0, curPageCount);
+			int bytesWrote = writeVirtualMemory(buf, buffer, 0, bytesRead);			
 			int bytesWrote = writeVirtualMemory(buf, buffer, 0, bytesRead);
 			if (bytesWrote == -1 || bytesWrote < bytesRead)
 				return -1;
 
 			totalBytesRead += bytesRead;
-			buf += pageSize;
+			buf += bytesWrote;
 		}
 		return totalBytesRead;
 	}
