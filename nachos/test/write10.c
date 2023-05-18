@@ -107,7 +107,6 @@ do_validate (char *fname, char *buffer, char *truth, int len)
     int fd, r;
 
     fd = do_open (fname);
-
     printf ("reading %s into buffer...\n", fname);
     r = read (fd, buffer, len);
     if (r < 0) {
@@ -125,7 +124,7 @@ do_validate (char *fname, char *buffer, char *truth, int len)
     r = 0;
     printf ("validating %s...\n", fname);
     while (r < len) {
-	if (buffer[r] != truth[r]) {
+    	if (buffer[r] != truth[r]) {
 	    printf ("...failed (offset %d: expected %c, read %c)\n",
 		    r, truth[r], buffer[r]);
 	    exit (-1006);
