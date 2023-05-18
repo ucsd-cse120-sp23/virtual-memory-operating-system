@@ -577,15 +577,16 @@ public class UserProcess {
 		byte[] argumentList = new byte[256]; // SIZE OF buffer??
 
 		int bytesRead = readVirtualMemory(argv, argumentList);
-		ArrayList<String> arguments = new ArrayList<String>();
+		String[] arguments = new String[argc];
 		for (int i = 0; i < argc; i++) {
 			String argumentEntry = readVirtualMemoryString(argumentList[i], 256);
-			arguments.add(argumentEntry);
+			arguments[i] = argumentEntry;
 		}
 
 		UserProcess childProcess = UserProcess.newUserProcess();
-		HashMap<Integer, String> children = new HashMap<Integer, String>();
+		HashMap<Integer, UserProcess> children = new HashMap<Integer, UserProcess>();
 		children.put(processID, childProcess);
+		childProcess.parent = this;
 		processID++;
 		childProcess.execute(filename, arguments);
 		return 0;
@@ -740,4 +741,5 @@ public class UserProcess {
 	private int openCount = 0;
 
 	private static int processID = 0;
+	private UserProcess parent = null;
 }
