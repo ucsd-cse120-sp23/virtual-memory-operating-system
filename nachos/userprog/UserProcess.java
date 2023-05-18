@@ -567,7 +567,28 @@ public class UserProcess {
 			return 0;
 		return -1;
 	}
+	
+	private int handleExec(int file, int argc, int argv) {
+		String filename = readVirtualMemoryString(file, 256);
+		//check if filename is a valid file with .coff extension
+		if (filename == null || !filename.contains(".coff"))
+			return -1;
 
+		if (argc < 0)
+			return -1;
+
+		byte[] argumentList = new byte[256]; //SIZE OF buffer??
+
+		int bytesRead = readVirtualMemory(argv, argumentList);
+		ArrayList<String> arguments = new ArrayList<String>();
+		for (int i = 0; i < argc; i++) {
+			String argumentEntry = readVirtualMemoryString(argumentList[i], 256);
+			arguments.add(argumentEntry);
+		}
+		
+		execute(filename, arguments);
+		return 0;
+	}
 	private static final int syscallHalt = 0, syscallExit = 1, syscallExec = 2,
 			syscallJoin = 3, syscallCreate = 4, syscallOpen = 5,
 			syscallRead = 6, syscallWrite = 7, syscallClose = 8,
@@ -713,4 +734,5 @@ public class UserProcess {
 	private ArrayList<OpenFile> OpenFileList = new ArrayList<OpenFile>();
 
 	private int openCount = 0;
+	private static int processID = 0;
 }
