@@ -676,7 +676,7 @@ public class UserProcess {
 			case syscallWrite:
 				return handleWrite(a0, a1, a2);
 			case syscallUnlink:
-				return handleClose(a0);
+				return handleUnlink(a0);
 			case syscallExec:
 				return handleExec(a1, a2, a3);
 			default:
