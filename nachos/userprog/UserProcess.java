@@ -426,7 +426,7 @@ public class UserProcess {
 	/**
 	 * Handle the exit() system call.
 	 */
-	private int handleExit(int status) {
+	private void handleExit(int status) {
 		// Do not remove this call to the autoGrader...
 		Machine.autoGrader().finishingCurrentProcess(status);
 		// ...and leave it as the top of handleExit so that we
@@ -436,6 +436,8 @@ public class UserProcess {
 		// for now, unconditionally terminate with just one process
 
 		// Close all Files in file table
+		this.thread.finish();
+		numProcess--;
 		for (int i = 0; i < OpenFileList.size(); i++) {
 			handleClose(i);
 		}
@@ -445,14 +447,12 @@ public class UserProcess {
 		coff.close();
 		// If it has a parent process -> save child's exit status in parent
 		if (parent != null) {
-			parent.exitStatus.add(status);
-			//Wake up parent if parent is sleeping
-			//if(parent.exitStatus)
+			parent.exitStatus.put(this.currProcessID, status);
 		}
-		//Close Kthread
-		this.thread.finish();
-		Kernel.kernel.terminate();
-		return 0; //not correct!!!!!
+		
+		if (numProcess == 0)
+			Kernel.kernel.terminate();
+
 	}
 
 	private int handleCreate(int vaname) {
@@ -701,7 +701,7 @@ public class UserProcess {
 			case syscallHalt:
 				return handleHalt();
 			case syscallExit:
-				return handleExit(a0);
+				handleExit(a0);
 			case syscallCreate:
 				return handleCreate(a0);
 			case syscallOpen:
@@ -785,5 +785,6 @@ public class UserProcess {
 
 	static int numProcess = 0;
 
-	private ArrayList<Integer> exitStatus = new ArrayList<Integer>();
+	private HashMap<Integer, Integer> exitStatus = new HashMap<Integer, Integer>();
+
 }
