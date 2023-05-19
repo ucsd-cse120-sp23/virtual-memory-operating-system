@@ -407,7 +407,7 @@ public class UserProcess {
 	/**
 	 * Handle the exit() system call.
 	 */
-	private int handleExit(int status) {
+	private void handleExit(int status) {
 		// Do not remove this call to the autoGrader...
 		Machine.autoGrader().finishingCurrentProcess(status);
 		// ...and leave it as the top of handleExit so that we
@@ -415,9 +415,24 @@ public class UserProcess {
 
 		Lib.debug(dbgProcess, "UserProcess.handleExit (" + status + ")");
 		// for now, unconditionally terminate with just one process
-		Kernel.kernel.terminate();
 
-		return 0;
+		// Close all Files in file table
+		for (int i = 0; i < OpenFileList.length; i++) {
+			handleClose(i);
+		}
+		// Release all memory return physical pages to the UserKernel
+		unloadSections();
+		// Close the coff sections
+		coff.close();
+		// If it has a parent process -> save child's exit status in parent
+		if (parent != null) {
+			parent.exitStatus = status;
+			//Wake up parent if parent is sleeping
+			if(parent.exitStatus)
+		}
+		//Close Kthread
+		Kthread.finish();
+		Kernel.kernel.terminate();
 	}
 
 	private int handleCreate(int vaname) {
@@ -579,7 +594,7 @@ public class UserProcess {
 		String[] arguments = new String[argc];
 		for (int i = 0; i < argc; i++) {
 			int bytesRead = readVirtualMemory(argv + i * 4, argumentList, i * 4, 4);
-			String argumentEntry = readVirtualMemoryString(Lib.bytesToInt(argumentList, i*4), 256);
+			String argumentEntry = readVirtualMemoryString(Lib.bytesToInt(argumentList, i * 4), 256);
 			arguments[i] = argumentEntry;
 		}
 
@@ -745,6 +760,6 @@ public class UserProcess {
 	protected int currProcessID;
 
 	private UserProcess parent = null;
-	
+
 	static int numProcess = 0;
 }
