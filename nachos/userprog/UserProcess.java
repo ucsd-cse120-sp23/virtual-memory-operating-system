@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 import javax.print.attribute.standard.PagesPerMinute;
+import javax.print.event.PrintJobAttributeEvent;
 
 /**
  * Encapsulates the state of a user process that is not contained in its user
@@ -425,7 +426,7 @@ public class UserProcess {
 	/**
 	 * Handle the exit() system call.
 	 */
-	private void handleExit(int status) {
+	private int handleExit(int status) {
 		// Do not remove this call to the autoGrader...
 		Machine.autoGrader().finishingCurrentProcess(status);
 		// ...and leave it as the top of handleExit so that we
@@ -435,7 +436,7 @@ public class UserProcess {
 		// for now, unconditionally terminate with just one process
 
 		// Close all Files in file table
-		for (int i = 0; i < OpenFileList.length; i++) {
+		for (int i = 0; i < OpenFileList.size(); i++) {
 			handleClose(i);
 		}
 		// Release all memory return physical pages to the UserKernel
@@ -444,13 +445,14 @@ public class UserProcess {
 		coff.close();
 		// If it has a parent process -> save child's exit status in parent
 		if (parent != null) {
-			parent.exitStatus = status;
+			parent.exitStatus.add(status);
 			//Wake up parent if parent is sleeping
-			if(parent.exitStatus)
+			//if(parent.exitStatus)
 		}
 		//Close Kthread
-		Kthread.finish();
+		this.thread.finish();
 		Kernel.kernel.terminate();
+		return 0; //not correct!!!!!
 	}
 
 	private int handleCreate(int vaname) {
@@ -541,7 +543,6 @@ public class UserProcess {
 			remaining -= pageSize;
 			bytesRead = file.read(buffer, 0, curPageCount);
 			int bytesWrote = writeVirtualMemory(buf, buffer, 0, bytesRead);			
-			int bytesWrote = writeVirtualMemory(buf, buffer, 0, bytesRead);
 			if (bytesWrote == -1 || bytesWrote < bytesRead)
 				return -1;
 
@@ -626,6 +627,8 @@ public class UserProcess {
 		childProcess.execute(filename, arguments);
 		return processID - 1;
 	}
+
+	
 
 	private static final int syscallHalt = 0, syscallExit = 1, syscallExec = 2,
 			syscallJoin = 3, syscallCreate = 4, syscallOpen = 5,
@@ -781,4 +784,6 @@ public class UserProcess {
 	private UserProcess parent = null;
 
 	static int numProcess = 0;
+
+	private ArrayList<Integer> exitStatus = new ArrayList<Integer>();
 }
