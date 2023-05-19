@@ -437,8 +437,7 @@ public class UserProcess {
 		Lib.debug(dbgProcess, "UserProcess.handleExit (" + status + ")");
 		// for now, unconditionally terminate with just one process
 
-		//Terminate the thread
-		this.thread.finish();
+		//Terminate the thread		
 		numProcess--;
 
 		// Close all Files in file table
@@ -456,6 +455,9 @@ public class UserProcess {
 		
 		if (numProcess == 0)
 			Kernel.kernel.terminate();
+
+		this.thread.finish();
+	
 
 	}
 
