@@ -628,8 +628,10 @@ public class UserProcess {
 		childProcess.parent = this;
 		numProcess++;
 		processID++;
-		childProcess.execute(filename, arguments);
-		return processID - 1;
+		if (childProcess.execute(filename, arguments))
+			return processID - 1;
+		else 
+			return -1;
 	}
 
 	private int handleJoin(int pid, int saddr){
@@ -641,7 +643,7 @@ public class UserProcess {
 		UserProcess childProcess = children.get(pid);
 		childProcess.thread.join();
 		children.remove(pid);
-		if(!exitStatus.containsKey(pid))
+		if(!exitStatus.containsKey(pid) || exitStatus.get(pid) == -1)
 			return 0;
 		int childStatus = exitStatus.get(pid);
 		exitStatus.remove(pid);
@@ -769,9 +771,10 @@ public class UserProcess {
 				break;
 
 			default:
-				Lib.debug(dbgProcess, "Unexpected exception: "
-						+ Processor.exceptionNames[cause]);
-				Lib.assertNotReached("Unexpected exception");
+				//Lib.debug(dbgProcess, "Unexpected exception: "
+					//	+ Processor.exceptionNames[cause]);
+				//Lib.assertNotReached("Unexpected exception");
+				handleExit(-1);
 		}
 	}
 
