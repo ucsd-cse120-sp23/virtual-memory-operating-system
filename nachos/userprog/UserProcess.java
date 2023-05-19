@@ -575,12 +575,11 @@ public class UserProcess {
 		if (argc < 0)
 			return -1;
 
-		byte[] argumentList = new byte[256]; // SIZE OF buffer??
-
-		int bytesRead = readVirtualMemory(argv, argumentList);
+		byte[] argumentList = new byte[4 * argc]; // SIZE OF buffer??
 		String[] arguments = new String[argc];
 		for (int i = 0; i < argc; i++) {
-			String argumentEntry = readVirtualMemoryString(argumentList[i], 256);
+			int bytesRead = readVirtualMemory(argv + i * 4, argumentList, i * 4, 4);
+			String argumentEntry = readVirtualMemoryString(Lib.bytesToInt(argumentList, i*4), 256);
 			arguments[i] = argumentEntry;
 		}
 
@@ -742,5 +741,8 @@ public class UserProcess {
 	private int openCount = 0;
 
 	private static int processID = 0;
+
 	private UserProcess parent = null;
+	
+	private static int numProcess = 0;
 }
