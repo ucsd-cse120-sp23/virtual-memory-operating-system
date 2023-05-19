@@ -114,7 +114,6 @@ public class UserProcess {
 		byte[] bytes = new byte[maxLength + 1];
 
 		int bytesRead = readVirtualMemory(vaddr, bytes);
-
 		for (int length = 0; length < bytesRead; length++) {
 			if (bytes[length] == 0)
 				return new String(bytes, 0, length);
@@ -457,8 +456,6 @@ public class UserProcess {
 			Kernel.kernel.terminate();
 
 		this.thread.finish();
-	
-
 	}
 
 	private int handleCreate(int vaname) {
@@ -610,13 +607,14 @@ public class UserProcess {
 	private int handleExec(int file, int argc, int argv) {
 		String filename = readVirtualMemoryString(file, 256);
 		// check if filename is a valid file with .coff extension
-		if (filename == null || !filename.contains(".coff"))
+		if (filename == null || !filename.contains(".coff")) {
 			return -1;
+		}
 
 		if (argc < 0)
 			return -1;
 
-		byte[] argumentList = new byte[4 * argc]; // SIZE OF buffer??
+		byte[] argumentList = new byte[4 * argc];
 		String[] arguments = new String[argc];
 		for (int i = 0; i < argc; i++) {
 			int bytesRead = readVirtualMemory(argv + i * 4, argumentList, i * 4, 4);
@@ -625,15 +623,33 @@ public class UserProcess {
 		}
 
 		UserProcess childProcess = UserProcess.newUserProcess();
-		HashMap<Integer, UserProcess> children = new HashMap<Integer, UserProcess>();
 		children.put(processID, childProcess);
 		childProcess.currProcessID = processID;
 		childProcess.parent = this;
+		numProcess++;
 		processID++;
 		childProcess.execute(filename, arguments);
 		return processID - 1;
 	}
 
+	private int handleJoin(int pid, int saddr){
+		if(!children.containsKey(pid))
+			return -1;
+		int maxVA = numPages * pageSize;
+		if(saddr < 0 || saddr >= maxVA)
+			return -1;
+		UserProcess childProcess = children.get(pid);
+		childProcess.thread.join();
+		children.remove(pid);
+		if(!exitStatus.containsKey(pid))
+			return 0;
+		int childStatus = exitStatus.get(pid);
+		exitStatus.remove(pid);
+		String stringStatus = "" + childStatus;
+		byte [] buffer = stringStatus.getBytes();
+		writeVirtualMemory(saddr, buffer);
+		return 1;
+	}
 	
 
 	private static final int syscallHalt = 0, syscallExit = 1, syscallExec = 2,
@@ -721,7 +737,9 @@ public class UserProcess {
 			case syscallUnlink:
 				return handleUnlink(a0);
 			case syscallExec:
-				return handleExec(a1, a2, a3);
+				return handleExec(a0, a1, a2);
+			case syscallJoin:
+				return handleJoin(a0, a1);
 			default:
 				Lib.debug(dbgProcess, "Unknown syscall " + syscall);
 				Lib.assertNotReached("Unknown system call!");
@@ -793,4 +811,5 @@ public class UserProcess {
 
 	private HashMap<Integer, Integer> exitStatus = new HashMap<Integer, Integer>();
 
+	HashMap<Integer, UserProcess> children = new HashMap<Integer, UserProcess>();
 }
