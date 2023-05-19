@@ -743,6 +743,7 @@ public class UserProcess {
 			case syscallJoin:
 				return handleJoin(a0, a1);
 			default:
+				handleExit(-1); //?maybe
 				Lib.debug(dbgProcess, "Unknown syscall " + syscall);
 				Lib.assertNotReached("Unknown system call!");
 		}
