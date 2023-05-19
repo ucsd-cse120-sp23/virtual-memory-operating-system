@@ -416,8 +416,10 @@ public class UserProcess {
 	 * Handle the halt() system call.
 	 */
 	private int handleHalt() {
-
-		Machine.halt();
+		if (this.currProcessID == 0)
+			Machine.halt();
+		else
+			return -1;
 
 		Lib.assertNotReached("Machine.halt() did not halt machine!");
 		return 0;
@@ -435,9 +437,11 @@ public class UserProcess {
 		Lib.debug(dbgProcess, "UserProcess.handleExit (" + status + ")");
 		// for now, unconditionally terminate with just one process
 
-		// Close all Files in file table
+		//Terminate the thread
 		this.thread.finish();
 		numProcess--;
+
+		// Close all Files in file table
 		for (int i = 0; i < OpenFileList.size(); i++) {
 			handleClose(i);
 		}
