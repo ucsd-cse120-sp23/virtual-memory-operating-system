@@ -586,6 +586,7 @@ public class UserProcess {
 		UserProcess childProcess = UserProcess.newUserProcess();
 		HashMap<Integer, UserProcess> children = new HashMap<Integer, UserProcess>();
 		children.put(processID, childProcess);
+		childProcess.currProcessID = processID;
 		childProcess.parent = this;
 		processID++;
 		childProcess.execute(filename, arguments);
@@ -740,9 +741,10 @@ public class UserProcess {
 
 	private int openCount = 0;
 
-	private static int processID = 0;
+	static int processID = 0;
+	protected int currProcessID;
 
 	private UserProcess parent = null;
 	
-	private static int numProcess = 0;
+	static int numProcess = 0;
 }

@@ -101,7 +101,9 @@ public class UserKernel extends ThreadedKernel {
 		super.run();
 
 		UserProcess process = UserProcess.newUserProcess();
-
+		process.currProcessID = UserProcess.processID;
+		UserProcess.processID++;
+		UserProcess.numProcess++;
 		String shellProgram = Machine.getShellProgramName();
 		if (!process.execute(shellProgram, new String[] {})) {
 		    System.out.println ("Could not find executable '" +
