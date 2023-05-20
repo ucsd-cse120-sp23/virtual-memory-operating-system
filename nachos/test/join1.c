@@ -13,7 +13,7 @@
 int
 main (int argc, char *argv[])
 {
-    char *prog = "exit1.coff";
+    char *prog = "exec1.coff";
     int pid, r, status = 0;
 
     printf ("execing %s...\n", prog);
