@@ -50,9 +50,11 @@ public class VMProcess extends UserProcess {
 	
 			pageTable = new TranslationEntry[numPages];
 			for (int i = 0; i < numPages; i++) {
-				pageTable[i].vpn = -1;
-				pageTable[i].ppn = -1;
-				pageTable[i].valid = false;
+
+				int ppn = UserKernel.getNextFreePage();
+				pageTable[i] = new TranslationEntry(i, ppn, false, false, false, false);
+				
+
 			}
 			lock.release();
 			return true;
@@ -87,6 +89,7 @@ public class VMProcess extends UserProcess {
 
 	protected boolean loadPage(int va) {
 		Lock lock = new Lock();
+		System.out.println("Load page entered ----------");
 		lock.acquire();
 		if (numPages > UserKernel.getNumFreePages()) {
 			coff.close();
@@ -96,6 +99,8 @@ public class VMProcess extends UserProcess {
 
 		// load sections
 		Processor processor = Machine.processor();
+		int vpn = Processor.pageFromAddress(va); // get vpn from va
+
 		for (int s = 0; s < coff.getNumSections(); s++) {
 			CoffSection section = coff.getSection(s);
 
@@ -107,25 +112,169 @@ public class VMProcess extends UserProcess {
 				//otherwise zerofill it. Create a byte with size of a page and zero-fill it, then load it into the memory
 				//we get from Processor.getMemory()
 				//return
-				int vpn = Processor.pageFromAddress(va); // get vpn from va
+
 				if (vpn == section.getFirstVPN() + i) {
-					int ppn = UserKernel.getNextFreePage();
-					section.loadPage(i, ppn);
+					System.out.println("load page if -----------");
+
+					int ppn = pageTable[vpn].ppn;
 					boolean isReadOnly = section.isReadOnly();
-
-					pageTable[vpn] = new TranslationEntry(vpn, ppn, false, isReadOnly, false, false);
+					pageTable[vpn].readOnly = isReadOnly;
+					pageTable[vpn].valid = true;
+					pageTable[vpn].used = true;
+					pageTable[vpn].dirty = false;
+					section.loadPage(i, ppn);
+					lock.release();
 					return true;
-				} else {
-					byte array[] = new byte[pageSize];
-					byte memory[] = processor.getMemory();
-					System.arraycopy(array, 0, memory, 0, pageSize);
 				}
-
 			}
 		}
+
+		byte memory[] = processor.getMemory();
+		byte array[] = new byte[pageSize];
+
+		int ppn = pageTable[vpn].ppn;
+		int paddr = ppn * pageSize;
+		pageTable[vpn].readOnly = false;
+		pageTable[vpn].used = true;
+		pageTable[vpn].valid = true;
+		pageTable[vpn].dirty = false;
+		System.arraycopy(array, 0, memory, paddr, pageSize);
+
+
+
 		lock.release();
 		return true;
 
+	}
+
+		/**
+	 * Transfer data from this process's virtual memory to all of the specified
+	 * array. Same as <tt>readVirtualMemory(vaddr, data, 0, data.length)</tt>.
+	 * 
+	 * @param vaddr the first byte of virtual memory to read.
+	 * @param data  the array where the data will be stored.
+	 * @return the number of bytes successfully transferred.
+	 */
+	public int readVirtualMemory(int vaddr, byte[] data) {
+		return readVirtualMemory(vaddr, data, 0, data.length);
+	}
+
+	/**
+	 * Transfer data from this process's virtual memory to the specified array.
+	 * This method handles address translation details. This method must
+	 * <i>not</i> destroy the current process if an error occurs, but instead
+	 * should return the number of bytes successfully copied (or zero if no data
+	 * could be copied).
+	 * 
+	 * @param vaddr  the first byte of virtual memory to read.
+	 * @param data   the array where the data will be stored.
+	 * @param offset the first byte to write in the array.
+	 * @param length the number of bytes to transfer from virtual memory to the
+	 *               array.
+	 * @return the number of bytes successfully transferred.
+	 */
+	public int readVirtualMemory(int vaddr, byte[] data, int offset, int length) {
+		Lib.assertTrue(offset >= 0 && length >= 0
+				&& offset + length <= data.length);
+
+		byte[] memory = Machine.processor().getMemory();
+
+		// Get VPN
+		int maxVA = numPages * (pageSize + 1) - 1;
+		if (vaddr < 0 || vaddr >= maxVA)
+			return 0;
+
+		int remaining = length;
+		int curPageCount = 0;
+		int totalRead = 0;
+		while(remaining > 0){
+			int vpn = Processor.pageFromAddress(vaddr);
+			if(pageTable[vpn].valid == false){
+				handleException(1);
+			}
+			int vaoffset = Processor.offsetFromAddress(vaddr);
+			int ppn = pageTable[vpn].ppn;
+			int paddr = pageSize * ppn + vaoffset;
+	
+			//if(remaining >= pageSize)
+				//curPageCount = pageSize;
+			//else
+				//curPageCount = remaining;
+			int spaceAvail = Math.min(length, pageSize - vaoffset);
+			int leftToRead = Math.min(spaceAvail, remaining);
+			remaining -= leftToRead;
+			System.arraycopy(memory, paddr, data, offset, leftToRead);
+			totalRead += leftToRead;
+			vaddr += leftToRead;
+			offset += leftToRead;
+			if (vaddr < 0 || vaddr >= maxVA)
+				return totalRead;
+		}
+		return totalRead;
+	}
+
+	/**
+	 * Transfer all data from the specified array to this process's virtual
+	 * memory. Same as <tt>writeVirtualMemory(vaddr, data, 0, data.length)</tt>.
+	 * 
+	 * @param vaddr the first byte of virtual memory to write.
+	 * @param data  the array containing the data to transfer.
+	 * @return the number of bytes successfully transferred.
+	 */
+	public int writeVirtualMemory(int vaddr, byte[] data) {
+		return writeVirtualMemory(vaddr, data, 0, data.length);
+	}
+
+	/**
+	 * Transfer data from the specified array to this process's virtual memory.
+	 * This method handles address translation details. This method must
+	 * <i>not</i> destroy the current process if an error occurs, but instead
+	 * should return the number of bytes successfully copied (or zero if no data
+	 * could be copied).
+	 * 
+	 * @param vaddr  the first byte of virtual memory to write.
+	 * @param data   the array containing the data to transfer.
+	 * @param offset the first byte to transfer from the array.
+	 * @param length the number of bytes to transfer from the array to virtual
+	 *               memory.
+	 * @return the number of bytes successfully transferred.
+	 */
+	public int writeVirtualMemory(int vaddr, byte[] data, int offset, int length) {
+		Lib.assertTrue(offset >= 0 && length >= 0
+				&& offset + length <= data.length);
+		byte[] memory = Machine.processor().getMemory();
+
+		// Get VPN
+		int maxVA = numPages * (pageSize + 1) - 1;
+		if (vaddr < 0 || vaddr >= maxVA)
+			return 0;
+
+		int remaining = length;
+		int curPageCount = 0;
+		int totalWrote = 0;
+
+		while(remaining > 0){
+			int vpn = Processor.pageFromAddress(vaddr);
+			if(pageTable[vpn].valid == false){
+
+				handleException(1);
+			}
+			int vaoffset = Processor.offsetFromAddress(vaddr);
+			int ppn = pageTable[vpn].ppn;
+			int paddr = pageSize * ppn + vaoffset;
+
+			int spaceAvail = Math.min(length, pageSize - vaoffset);
+			int leftToWrite = Math.min(spaceAvail, remaining);
+			remaining -= leftToWrite;
+			System.arraycopy(data, offset, memory, paddr, leftToWrite);	
+			totalWrote += leftToWrite;
+			offset += leftToWrite;
+			vaddr += leftToWrite;
+			
+			if (vaddr < 0 || vaddr >= maxVA)
+				return totalWrote;
+		}
+		return totalWrote;
 	}
 
 	private static final int pageSize = Processor.pageSize;
