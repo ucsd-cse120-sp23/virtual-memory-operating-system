@@ -160,12 +160,14 @@ public class UserProcess {
 			return 0;
 
 		int remaining = length;
+		//System.out.println("HERE" + remaining);
 		int curPageCount = 0;
 		int totalRead = 0;
 		while(remaining > 0){
 			int vpn = Processor.pageFromAddress(vaddr);
 			int vaoffset = Processor.offsetFromAddress(vaddr);
 			int ppn = pageTable[vpn].ppn;
+			//System.out.println(ppn);
 			int paddr = pageSize * ppn + vaoffset;
 	
 			//if(remaining >= pageSize)
@@ -179,6 +181,7 @@ public class UserProcess {
 			totalRead += leftToRead;
 			vaddr += leftToRead;
 			offset += leftToRead;
+			//System.out.println("read: " + totalRead);
 			if (vaddr < 0 || vaddr >= maxVA)
 				return totalRead;
 		}
@@ -561,6 +564,7 @@ public class UserProcess {
 	}
 
 	private int handleWrite(int descriptor, int buf, int count) {
+		//System.out.println("asdiasdhkasdasdj");
 		if (descriptor > 15 || descriptor < 0)
 			return -1;
 		OpenFile file = OpenFileList.get(descriptor);

@@ -77,10 +77,10 @@ public class VMProcess extends UserProcess {
 	public void handleException(int cause) {
 		Processor processor = Machine.processor();
 		//cause = 1 so page fault occurs
-		int va = -1;
 		switch (cause) {
-			case 1: va = processor.readRegister(Processor.regBadVAddr);	//virtual address of the exception register
+			case 1: int va = processor.readRegister(Processor.regBadVAddr);	//virtual address of the exception register
 					loadPage(va);
+					break;
 			default:
 				super.handleException(cause);
 				break;
@@ -89,7 +89,6 @@ public class VMProcess extends UserProcess {
 
 	protected boolean loadPage(int va) {
 		Lock lock = new Lock();
-		System.out.println("Load page entered ----------");
 		lock.acquire();
 		if (numPages > UserKernel.getNumFreePages()) {
 			coff.close();
@@ -114,8 +113,6 @@ public class VMProcess extends UserProcess {
 				//return
 
 				if (vpn == section.getFirstVPN() + i) {
-					System.out.println("load page if -----------");
-
 					int ppn = pageTable[vpn].ppn;
 					boolean isReadOnly = section.isReadOnly();
 					pageTable[vpn].readOnly = isReadOnly;
@@ -128,7 +125,7 @@ public class VMProcess extends UserProcess {
 				}
 			}
 		}
-
+		
 		byte memory[] = processor.getMemory();
 		byte array[] = new byte[pageSize];
 
@@ -139,9 +136,6 @@ public class VMProcess extends UserProcess {
 		pageTable[vpn].valid = true;
 		pageTable[vpn].dirty = false;
 		System.arraycopy(array, 0, memory, paddr, pageSize);
-
-
-
 		lock.release();
 		return true;
 
@@ -187,10 +181,12 @@ public class VMProcess extends UserProcess {
 		int remaining = length;
 		int curPageCount = 0;
 		int totalRead = 0;
+
 		while(remaining > 0){
 			int vpn = Processor.pageFromAddress(vaddr);
+			int offse = Processor.offsetFromAddress(vaddr);
 			if(pageTable[vpn].valid == false){
-				handleException(1);
+				this.loadPage(Processor.makeAddress(vpn, offse));
 			}
 			int vaoffset = Processor.offsetFromAddress(vaddr);
 			int ppn = pageTable[vpn].ppn;
@@ -207,6 +203,7 @@ public class VMProcess extends UserProcess {
 			totalRead += leftToRead;
 			vaddr += leftToRead;
 			offset += leftToRead;
+
 			if (vaddr < 0 || vaddr >= maxVA)
 				return totalRead;
 		}
@@ -255,9 +252,9 @@ public class VMProcess extends UserProcess {
 
 		while(remaining > 0){
 			int vpn = Processor.pageFromAddress(vaddr);
+			int offse = Processor.offsetFromAddress(vaddr);
 			if(pageTable[vpn].valid == false){
-
-				handleException(1);
+				this.loadPage(Processor.makeAddress(vpn, offse));
 			}
 			int vaoffset = Processor.offsetFromAddress(vaddr);
 			int ppn = pageTable[vpn].ppn;
