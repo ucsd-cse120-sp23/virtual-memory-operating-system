@@ -51,9 +51,8 @@ public class VMProcess extends UserProcess {
 			pageTable = new TranslationEntry[numPages];
 			for (int i = 0; i < numPages; i++) {
 
-				int ppn = UserKernel.getNextFreePage();
-				pageTable[i] = new TranslationEntry(i, ppn, false, false, false, false);
-				
+				//int ppn = UserKernel.getNextFreePage();
+				pageTable[i] = new TranslationEntry(-1, -1, false, false, false, false);
 
 			}
 			lock.release();
@@ -79,6 +78,9 @@ public class VMProcess extends UserProcess {
 		//cause = 1 so page fault occurs
 		switch (cause) {
 			case 1: int va = processor.readRegister(Processor.regBadVAddr);	//virtual address of the exception register
+					int ppn = UserKernel.getNextFreePage();
+					pageTable[i].vpn = i;
+					pageTable[i].ppn = ppn;
 					loadPage(va);
 					break;
 			default:
