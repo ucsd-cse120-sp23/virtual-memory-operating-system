@@ -159,7 +159,7 @@ public class VMProcess extends UserProcess {
 
 
 		if(dirty) {
-			
+			//read from swapfile 
 		}
 		for (int s = 0; s < coff.getNumSections(); s++) {
 			CoffSection section = coff.getSection(s);
