@@ -21,6 +21,7 @@ public class VMKernel extends UserKernel {
 	 */
 	public void initialize(String[] args) {
 		super.initialize(args);
+		swapFile = fileSystem.open("swap", true);
 	}
 
 	/**
@@ -48,4 +49,6 @@ public class VMKernel extends UserKernel {
 	private static VMProcess dummy1 = null;
 
 	private static final char dbgVM = 'v';
+
+	public static OpenFile swapFile;
 }

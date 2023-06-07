@@ -1,5 +1,7 @@
 package nachos.vm;
 
+import java.util.ArrayList;
+
 import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
@@ -42,7 +44,7 @@ public class VMProcess extends UserProcess {
 		//return super.loadSections();
 			Lock lock = new Lock();
 			lock.acquire();
-			if (numPages > UserKernel.getNumFreePages()) {
+			if (numPages > VMKernel.getNumFreePages()) {
 				coff.close();
 				Lib.debug(dbgProcess, "\tinsufficient physical memory");
 				return false;
@@ -78,9 +80,10 @@ public class VMProcess extends UserProcess {
 		//cause = 1 so page fault occurs
 		switch (cause) {
 			case 1: int va = processor.readRegister(Processor.regBadVAddr);	//virtual address of the exception register
-					int ppn = UserKernel.getNextFreePage();
-					pageTable[i].vpn = i;
-					pageTable[i].ppn = ppn;
+					int ppn = VMKernel.getNextFreePage();
+					int vpn = Processor.pageFromAddress(va);
+					pageTable[vpn].vpn = vpn;
+					pageTable[vpn].ppn = ppn;
 					loadPage(va);
 					break;
 			default:
@@ -89,19 +92,75 @@ public class VMProcess extends UserProcess {
 		}
 	}
 
+	protected int evictionClock(){
+		int freePages = VMKernel.getNumFreePages();
+		if(freePages != 0)
+			return -1;
+		else{
+			//Lock lock = new Lock();
+			//Condition condition = new Condition(lock);
+			int counter = IPT.size();
+			int i = 0;
+
+			while(i < counter){
+				int index = IPT.get(evictPage).index;
+				VMProcess curProc = IPT.get(evictPage).process;
+				int ppn = curProc.pageTable[index].ppn;
+				Boolean used = curProc.pageTable[index].used;
+				Boolean pinned = IPT.get(evictPage).pinned;
+				if(used && !pinned)
+					curProc.pageTable[index].used = false;
+				else if (!used && !pinned){
+					curProc.pageTable[index].valid = false;
+					Boolean dirty = curProc.pageTable[index].dirty;
+					if(dirty){
+						byte[] memory = Machine.processor().getMemory();
+						byte[] buffer = new byte[pageSize];
+						System.arraycopy(memory, ppn * pageSize, buffer, 0, pageSize);
+						if(freeSwapList.size() != 0){ //if there's a gap in swap file, we replace instead of append
+							int free = freeSwapList.remove(0);
+							VMKernel.swapFile.write(free* pageSize , buffer, 0, pageSize); //overrite 
+							curProc.pageTable[index].vpn = free; 
+						} else{
+							int free = numOfSwap; //should really be endOfSwap namewise.... 
+							numOfSwap++;
+							VMKernel.swapFile.write(free* pageSize , buffer, 0, pageSize); //append
+							curProc.pageTable[index].vpn = free; 
+						}
+					}
+					evictPage = (evictPage + 1) % IPT.size();
+					return ppn;
+				}
+				i++;
+				evictPage = (evictPage + 1) % IPT.size();
+			}
+			return -1; //condition variable
+		}
+	}
+
 	protected boolean loadPage(int va) {
 		Lock lock = new Lock();
 		lock.acquire();
-		if (numPages > UserKernel.getNumFreePages()) {
+		if (numPages > VMKernel.getNumFreePages()) {
 			coff.close();
 			Lib.debug(dbgProcess, "\tinsufficient physical memory");
 			return false;
 		}
 
+		int removedPPN = evictionClock();
+
 		// load sections
 		Processor processor = Machine.processor();
 		int vpn = Processor.pageFromAddress(va); // get vpn from va
+		
+		int ppn = (removedPPN == -1) ? VMKernel.getNumFreePages() : removedPPN;
 
+		boolean dirty = pageTable[vpn].dirty;
+
+
+		if(dirty) {
+			
+		}
 		for (int s = 0; s < coff.getNumSections(); s++) {
 			CoffSection section = coff.getSection(s);
 
@@ -115,7 +174,7 @@ public class VMProcess extends UserProcess {
 				//return
 
 				if (vpn == section.getFirstVPN() + i) {
-					int ppn = pageTable[vpn].ppn;
+					//int ppn = pageTable[vpn].ppn;
 					boolean isReadOnly = section.isReadOnly();
 					pageTable[vpn].readOnly = isReadOnly;
 					pageTable[vpn].valid = true;
@@ -276,9 +335,32 @@ public class VMProcess extends UserProcess {
 		return totalWrote;
 	}
 
+	private class IPTdata{
+		IPTdata(int p, int i, boolean pin, VMProcess proc){
+			ppn = p;
+			index = i;
+			process = proc;
+			pinned = pin;
+		}
+		int ppn, index;
+		VMProcess process;
+		boolean pinned;
+	}
+
+
 	private static final int pageSize = Processor.pageSize;
 
 	private static final char dbgProcess = 'a';
 
 	private static final char dbgVM = 'v';
+
+	private static ArrayList<Integer> freeSwapList = new ArrayList<Integer>();
+	
+	private static int evictPage = 0;
+
+	private static ArrayList<IPTdata> IPT = new ArrayList<IPTdata>();
+
+	private static int numOfSwap = 0;
+	
+
 }
