@@ -1,6 +1,9 @@
 package nachos.vm;
 
+import java.lang.management.MemoryNotificationInfo;
 import java.util.ArrayList;
+
+import javax.print.attribute.standard.PageRanges;
 
 import nachos.machine.*;
 import nachos.threads.*;
@@ -94,9 +97,11 @@ public class VMProcess extends UserProcess {
 
 	protected int evictionClock(){
 		int freePages = VMKernel.getNumFreePages();
-		if(freePages != 0)
+		if(freePages != 0){
+			System.out.println("-----------------------------HOPEFULLY!");
+			System.out.println("num of free pages is " + freePages);
 			return -1;
-		else{
+		} else{
 			//Lock lock = new Lock();
 			//Condition condition = new Condition(lock);
 			int counter = IPT.size();
@@ -134,6 +139,7 @@ public class VMProcess extends UserProcess {
 				i++;
 				evictPage = (evictPage + 1) % IPT.size();
 			}
+			
 			return -1; //condition variable
 		}
 	}
@@ -152,54 +158,101 @@ public class VMProcess extends UserProcess {
 		// load sections
 		Processor processor = Machine.processor();
 		int vpn = Processor.pageFromAddress(va); // get vpn from va
+	
+		int ppn;
 		
-		int ppn = (removedPPN == -1) ? VMKernel.getNumFreePages() : removedPPN;
+		if (removedPPN == -1) //free pages available, just get it.
+			ppn = VMKernel.getNextFreePage();
+		else
+			ppn = removedPPN; //this page has been evicted and saved, now can be overwritten
+
+		boolean IPTFull = false;
+
+		if (removedPPN == -1) {
+			IPTFull = false;
+		} else
+			IPTFull = true;
+
 
 		boolean dirty = pageTable[vpn].dirty;
 
+		byte[] memory = Machine.processor().getMemory();
 
-		if(dirty) {
-			//read from swapfile 
-		}
-		for (int s = 0; s < coff.getNumSections(); s++) {
-			CoffSection section = coff.getSection(s);
+		if(dirty) { //read from swapfile
+			byte [] buffer = new byte[pageSize];
+			VMKernel.swapFile.read(pageTable[vpn].vpn * pageSize , buffer, 0, pageSize);
+			System.arraycopy(buffer, 0, memory, ppn*pageSize, pageSize); //load to physical memory
+			pageTable[vpn].valid = true;
+			pageTable[vpn].used = true;
+			pageTable[vpn].ppn = ppn;
+			int idx = findIdexOfPPN(ppn);
+			IPT.get(idx).ppn = ppn;
+			IPT.get(idx).index = vpn; //index, actual vpn
+			IPT.get(idx).process = this;
+			IPT.get(idx).pinned = false; //just loaded, shouldn't be pinned
+			lock.release();
+			return true;
+			//pagetable[vpn].vpn which is really the spn, is useless, old spn might be taken away
+		} else {
+			for (int s = 0; s < coff.getNumSections(); s++) {
+				CoffSection section = coff.getSection(s);
 
-			Lib.debug(dbgProcess, "\tinitializing " + section.getName()
-					+ " section (" + section.getLength() + " pages)");
+				Lib.debug(dbgProcess, "\tinitializing " + section.getName()
+						+ " section (" + section.getLength() + " pages)");
 
-			for (int i = 0; i < section.getLength(); i++) {
-				//check if vpn is inside section.getFirstVPN() + i, if it is inside means data segment and continue
-				//otherwise zerofill it. Create a byte with size of a page and zero-fill it, then load it into the memory
-				//we get from Processor.getMemory()
-				//return
+				for (int i = 0; i < section.getLength(); i++) {
+					//check if vpn is inside section.getFirstVPN() + i, if it is inside means data segment and continue
+					//otherwise zerofill it. Create a byte with size of a page and zero-fill it, then load it into the memory
+					//we get from Processor.getMemory()
+					//return
+					if (vpn == section.getFirstVPN() + i) {
+						boolean isReadOnly = section.isReadOnly();
+						pageTable[vpn].readOnly = isReadOnly;
+						pageTable[vpn].valid = true;
+						pageTable[vpn].used = true;
+						pageTable[vpn].dirty = false;
+						pageTable[vpn].ppn = ppn; //updates ppn
+						section.loadPage(i, ppn);
 
-				if (vpn == section.getFirstVPN() + i) {
-					//int ppn = pageTable[vpn].ppn;
-					boolean isReadOnly = section.isReadOnly();
-					pageTable[vpn].readOnly = isReadOnly;
-					pageTable[vpn].valid = true;
-					pageTable[vpn].used = true;
-					pageTable[vpn].dirty = false;
-					section.loadPage(i, ppn);
-					lock.release();
-					return true;
+						if (IPTFull) {
+							int idx = findIdexOfPPN(ppn);
+							IPT.get(idx).ppn = ppn;
+							IPT.get(idx).index = vpn; //index, actual vpn
+							IPT.get(idx).process = this;
+							IPT.get(idx).pinned = false; //just loaded, shouldn't be pinned
+						}else{ //ipt not full
+							IPTdata data = new IPTdata(ppn, vpn, false, this);
+							IPT.add(data);
+						}
+						lock.release();
+						return true;
+					}
 				}
 			}
-		}
 		
-		byte memory[] = processor.getMemory();
-		byte array[] = new byte[pageSize];
+			byte array[] = new byte[pageSize];
 
-		int ppn = pageTable[vpn].ppn;
-		int paddr = ppn * pageSize;
-		pageTable[vpn].readOnly = false;
-		pageTable[vpn].used = true;
-		pageTable[vpn].valid = true;
-		pageTable[vpn].dirty = false;
-		System.arraycopy(array, 0, memory, paddr, pageSize);
-		lock.release();
-		return true;
+			int paddr = ppn * pageSize;
+			pageTable[vpn].readOnly = false;
+			pageTable[vpn].used = true;
+			pageTable[vpn].valid = true;
+			pageTable[vpn].dirty = false;
+			System.arraycopy(array, 0, memory, paddr, pageSize);
+			
+			if (IPTFull) {
+				int idx = findIdexOfPPN(ppn);
+				IPT.get(idx).ppn = ppn;
+				IPT.get(idx).index = vpn; //index, actual vpn
+				IPT.get(idx).process = this;
+				IPT.get(idx).pinned = false; //just loaded, shouldn't be pinned
+			}else{ //ipt not full
+				IPTdata data = new IPTdata(ppn, vpn, false, this);
+				IPT.add(data);
+			}
 
+			lock.release();
+			return true;
+		}
 	}
 
 		/**
@@ -247,7 +300,7 @@ public class VMProcess extends UserProcess {
 			int vpn = Processor.pageFromAddress(vaddr);
 			int offse = Processor.offsetFromAddress(vaddr);
 			if(pageTable[vpn].valid == false){
-				this.loadPage(Processor.makeAddress(vpn, offse));
+				this.loadPage(Processor.makeAddress(vpn, offse)); // same as just using vaddr
 			}
 			int vaoffset = Processor.offsetFromAddress(vaddr);
 			int ppn = pageTable[vpn].ppn;
@@ -335,6 +388,14 @@ public class VMProcess extends UserProcess {
 		return totalWrote;
 	}
 
+	private int findIdexOfPPN( int ppn){
+		for(int i = 0; i < IPT.size(); i++){
+			if(IPT.get(i).ppn == ppn)
+				return i;
+		}
+		return -1;
+	}
+
 	private class IPTdata{
 		IPTdata(int p, int i, boolean pin, VMProcess proc){
 			ppn = p;
@@ -346,7 +407,6 @@ public class VMProcess extends UserProcess {
 		VMProcess process;
 		boolean pinned;
 	}
-
 
 	private static final int pageSize = Processor.pageSize;
 
