@@ -22,8 +22,7 @@ public class VMKernel extends UserKernel {
 	 */
 	public void initialize(String[] args) {
 		super.initialize(args);
-		swapFile = fileSystem.open("swap", true);
-
+		swapFile = ThreadedKernel.fileSystem.open("swap", true);
 	}
 
 	/**

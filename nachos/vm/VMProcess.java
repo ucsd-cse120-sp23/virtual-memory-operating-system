@@ -46,7 +46,7 @@ public class VMProcess extends UserProcess {
 	 */
 	protected boolean loadSections() {
 		//return super.loadSections();
-	
+			rwLock.acquire();
 			pageTable = new TranslationEntry[numPages];
 			for (int i = 0; i < numPages; i++) {
 
@@ -54,6 +54,7 @@ public class VMProcess extends UserProcess {
 				pageTable[i] = new TranslationEntry(-1, -1, false, false, false, false);
 
 			}
+			rwLock.release();
 			return true;
 	}
 
@@ -62,16 +63,17 @@ public class VMProcess extends UserProcess {
 	 */
 	protected void unloadSections() {
 		sLock.acquire();
-		printPageTable();
-		printIPT();
-		System.out.println("The number of times swap is APPENDED " + numOfSwap);
-		System.out.println("The number of times swap is ACCESSED " + numOfSwapAcess);
+		//printPageTable();
+		//printIPT();
+		//System.out.println("The number of times swap is APPENDED " + numOfSwap);
+		//System.out.println("The number of times swap is ACCESSED " + numOfSwapAcess);
 
 
 		//printPageTable();
 
 		for (int i = 0; i < pageTable.length; i++) {
 			if(pageTable[i].valid == true) {
+				pageTable[i].valid = false;
 				UserKernel.addFreePage(pageTable[i].ppn);
 				int idx = findIdexOfPPN(pageTable[i].ppn);
 				IPT.remove(idx);
@@ -96,8 +98,8 @@ public class VMProcess extends UserProcess {
 					sLock.acquire();
 					int va = processor.readRegister(Processor.regBadVAddr);	//virtual address of the exception register
 					//int ppn = VMKernel.getNextFreePage();
-					int vpn = Processor.pageFromAddress(va);
-					pageTable[vpn].vpn = vpn;
+					//nt vpn = Processor.pageFromAddress(va);
+					//pageTable[vpn].vpn = vpn;
 					//pageTable[vpn].ppn = ppn;
 					loadPage(va);
 					sLock.release();
@@ -122,10 +124,10 @@ public class VMProcess extends UserProcess {
 					VMProcess curProc = IPT.get(evictPage).process;
 					int ppn = curProc.pageTable[index].ppn;
 					Boolean used = curProc.pageTable[index].used;
-					Boolean pinned = IPT.get(evictPage).pinned;
-					if(used && !pinned)
+					//Boolean pinned = IPT.get(evictPage).pinned;
+					if(used)
 						curProc.pageTable[index].used = false;
-					else if (!used && !pinned){
+					else if (!used){
 						curProc.pageTable[index].valid = false;
 						Boolean dirty = curProc.pageTable[index].dirty;
 						if(dirty){
@@ -144,6 +146,8 @@ public class VMProcess extends UserProcess {
 								curProc.pageTable[index].vpn = free; 
 							}
 						}
+						//int idx = findIdexOfPPN(ppn);
+						//IPT.remove(idx);
 						evictPage = (evictPage + 1) % IPT.size();
 						return ppn;
 					}
@@ -192,15 +196,27 @@ public class VMProcess extends UserProcess {
 		if(dirty) { //read from swapfile
 			byte [] buffer = new byte[pageSize];
 			VMKernel.swapFile.read(pageTable[vpn].vpn * pageSize , buffer, 0, pageSize);
+			freeSwapList.add(pageTable[vpn].vpn);
 			System.arraycopy(buffer, 0, memory, ppn*pageSize, pageSize); //load to physical memory
 			pageTable[vpn].valid = true;
 			pageTable[vpn].used = true; //
 			pageTable[vpn].ppn = ppn;
-			int idx = findIdexOfPPN(ppn);
-			IPT.get(idx).ppn = ppn;
-			IPT.get(idx).index = vpn; //index, actual vpn
-			IPT.get(idx).process = this;
-			IPT.get(idx).pinned = false; //just loaded, shouldn't be pinned
+			if (IPTFull) {
+				int idx = findIdexOfPPN(ppn);
+				IPT.get(idx).ppn = ppn;
+				IPT.get(idx).index = vpn; //index, actual vpn
+				IPT.get(idx).process = this;
+				IPT.get(idx).pinned = false; //just loaded, shouldn't be pinned
+			}else{ //ipt not full
+				IPTdata data = new IPTdata(ppn, vpn, false, this);
+				IPT.add(data);
+				//here
+			}
+			//int idx = findIdexOfPPN(ppn);
+			//IPT.get(idx).ppn = ppn;
+			//IPT.get(idx).index = vpn; //index, actual vpn
+			//IPT.get(idx).process = this;
+			//IPT.get(idx).pinned = false; //just loaded, shouldn't be pinned
 			return true;
 			//pagetable[vpn].vpn which is really the spn, is useless, old spn might be taken away
 		} else {
@@ -253,7 +269,7 @@ public class VMProcess extends UserProcess {
 				IPT.get(idx).ppn = ppn;
 				IPT.get(idx).index = vpn; //index, actual vpn
 				IPT.get(idx).process = this;
-				IPT.get(idx).pinned = false; //just loaded, shouldn't be pinned
+		//		IPT.get(idx).pinned = false; //just loaded, shouldn't be pinned
 			}else{ //ipt not full
 				IPTdata data = new IPTdata(ppn, vpn, false, this);
 				IPT.add(data);
@@ -416,6 +432,7 @@ public class VMProcess extends UserProcess {
 			remaining -= leftToWrite;
 			
 			System.arraycopy(data, offset, memory, paddr, leftToWrite);
+			pageTable[vpn].dirty = true;
 			IPT.get(idx).pinned = false;
 			//cv.wake();
 			totalWrote += leftToWrite;
