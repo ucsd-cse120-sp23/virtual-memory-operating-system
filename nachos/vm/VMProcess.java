@@ -48,11 +48,6 @@ public class VMProcess extends UserProcess {
 			Lock lock = new Lock();
 			lock.acquire();
 			System.out.println("12313131221323213123");
-			if (numPages > VMKernel.getNumFreePages()) {
-				coff.close();
-				Lib.debug(dbgProcess, "\tinsufficient physical memory");
-				return false;
-			}
 	
 			pageTable = new TranslationEntry[numPages];
 			for (int i = 0; i < numPages; i++) {
@@ -110,10 +105,11 @@ public class VMProcess extends UserProcess {
 		switch (cause) {
 			case 1: int va = processor.readRegister(Processor.regBadVAddr);	//virtual address of the exception register
 					//int ppn = VMKernel.getNextFreePage();
-					//int vpn = Processor.pageFromAddress(va);
-					//pageTable[vpn].vpn = vpn;
+					int vpn = Processor.pageFromAddress(va);
+					pageTable[vpn].vpn = vpn;
 					//pageTable[vpn].ppn = ppn;
 					loadPage(va);
+					System.out.println("Vpn: " + vpn);
 					break;
 			default:
 				super.handleException(cause);
@@ -165,21 +161,16 @@ public class VMProcess extends UserProcess {
 				i++;
 				evictPage = (evictPage + 1) % IPT.size();
 			}
-			
+			System.out.println("HERE IS THE PROBLEM");
 			return -1; //condition variable
 		}
 	}
 
 	protected boolean loadPage(int va) {
-		//System.out.println("Yourasdasdas");
 		Lock lock = new Lock();
 		lock.acquire();
-		if (numPages > VMKernel.getNumFreePages()) {
-			coff.close();
-			Lib.debug(dbgProcess, "\tinsufficient physical memory");
-			return false;
-		}
 
+		System.out.println("Yourasdasdas");
 		int removedPPN = evictionClock();
 
 		// load sections
@@ -226,9 +217,6 @@ public class VMProcess extends UserProcess {
 				
 				CoffSection section = coff.getSection(s);
 
-				Lib.debug(dbgProcess, "\tinitializing " + section.getName()
-						+ " section (" + section.getLength() + " pages)");
-
 				for (int i = 0; i < section.getLength(); i++) {
 					//check if vpn is inside section.getFirstVPN() + i, if it is inside means data segment and continue
 					//otherwise zerofill it. Create a byte with size of a page and zero-fill it, then load it into the memory
@@ -255,7 +243,6 @@ public class VMProcess extends UserProcess {
 							//here
 						}
 						lock.release();
-						System.out.println("is this looping here?");
 						return true;
 					}
 				}
@@ -334,6 +321,7 @@ public class VMProcess extends UserProcess {
 			if(pageTable[vpn].valid == false){
 				this.loadPage(Processor.makeAddress(vpn, offse)); // same as just using vaddr
 			}
+
 			int vaoffset = Processor.offsetFromAddress(vaddr);
 			int ppn = pageTable[vpn].ppn;
 			int paddr = pageSize * ppn + vaoffset;
