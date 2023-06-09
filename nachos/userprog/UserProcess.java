@@ -385,10 +385,13 @@ public class UserProcess {
 	protected void unloadSections() {
 		Lock lock = new Lock();
 		lock.acquire();
+		System.out.println("BLAKBLACKASKCASKCASCA");
 		for (int i = 0; i < pageTable.length; i++) {
 			UserKernel.addFreePage(pageTable[i].ppn);
+			
 		}
 		lock.release();
+		System.out.println(UserKernel.freePPNs);
 	}
 
 	/**

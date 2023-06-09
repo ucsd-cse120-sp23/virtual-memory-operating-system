@@ -36,6 +36,7 @@ public class UserKernel extends ThreadedKernel {
 		for (int i = 0; i < numPhysPages; i++){
 			freePPNs.add(i);
 		}
+		System.out.println("GOD HELP ME " + freePPNs.size());
 	}
 
 	/**
@@ -151,5 +152,5 @@ public class UserKernel extends ThreadedKernel {
 	private static Coff dummy1 = null;
 
 	// free
-	private static ArrayList<Integer> freePPNs;
+	public static ArrayList<Integer> freePPNs;
 }

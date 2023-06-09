@@ -47,6 +47,7 @@ public class VMProcess extends UserProcess {
 		//return super.loadSections();
 			Lock lock = new Lock();
 			lock.acquire();
+			System.out.println("12313131221323213123");
 			if (numPages > VMKernel.getNumFreePages()) {
 				coff.close();
 				Lib.debug(dbgProcess, "\tinsufficient physical memory");
@@ -68,7 +69,32 @@ public class VMProcess extends UserProcess {
 	 * Release any resources allocated by <tt>loadSections()</tt>.
 	 */
 	protected void unloadSections() {
-		super.unloadSections();
+		Lock lock = new Lock();
+		lock.acquire();
+		System.out.println(UserKernel.freePPNs);
+		System.out.println("Page Table size ---------------");
+		printPageTable();
+		System.out.println(pageTable.length);
+		System.out.println(IPT.size());
+		System.out.println("IPT PPNSS ____________________________________________________");
+		
+		for (int j = 0; j < IPT.size(); j++) {
+			System.out.println(IPT.get(j).ppn + " " + IPT.get(j).process + " " +IPT.get(j).index );
+		}
+		System.out.println(IPT);
+		for (int i = 0; i < pageTable.length; i++) {
+			if(pageTable[i].valid == true) {
+				System.out.println("YIYIIASASDASDSDASADDSADA");
+				UserKernel.addFreePage(pageTable[i].ppn);
+				int idx = findIdexOfPPN(pageTable[i].ppn);
+				System.out.println("Page table ppn: " + pageTable[i].ppn);
+				System.out.println("INDEX: " + idx);
+				IPT.remove(idx);
+				//System.out.println(IPT.size());
+			}
+		}
+		lock.release();
+		
 	}
 
 	/**
@@ -83,10 +109,10 @@ public class VMProcess extends UserProcess {
 		//cause = 1 so page fault occurs
 		switch (cause) {
 			case 1: int va = processor.readRegister(Processor.regBadVAddr);	//virtual address of the exception register
-					int ppn = VMKernel.getNextFreePage();
-					int vpn = Processor.pageFromAddress(va);
-					pageTable[vpn].vpn = vpn;
-					pageTable[vpn].ppn = ppn;
+					//int ppn = VMKernel.getNextFreePage();
+					//int vpn = Processor.pageFromAddress(va);
+					//pageTable[vpn].vpn = vpn;
+					//pageTable[vpn].ppn = ppn;
 					loadPage(va);
 					break;
 			default:
@@ -145,6 +171,7 @@ public class VMProcess extends UserProcess {
 	}
 
 	protected boolean loadPage(int va) {
+		//System.out.println("Yourasdasdas");
 		Lock lock = new Lock();
 		lock.acquire();
 		if (numPages > VMKernel.getNumFreePages()) {
@@ -161,8 +188,9 @@ public class VMProcess extends UserProcess {
 	
 		int ppn;
 		
-		if (removedPPN == -1) //free pages available, just get it.
+		if (removedPPN == -1){ //free pages available, just get it.
 			ppn = VMKernel.getNextFreePage();
+		}
 		else
 			ppn = removedPPN; //this page has been evicted and saved, now can be overwritten
 
@@ -195,6 +223,7 @@ public class VMProcess extends UserProcess {
 			//pagetable[vpn].vpn which is really the spn, is useless, old spn might be taken away
 		} else {
 			for (int s = 0; s < coff.getNumSections(); s++) {
+				
 				CoffSection section = coff.getSection(s);
 
 				Lib.debug(dbgProcess, "\tinitializing " + section.getName()
@@ -213,7 +242,7 @@ public class VMProcess extends UserProcess {
 						pageTable[vpn].dirty = false;
 						pageTable[vpn].ppn = ppn; //updates ppn
 						section.loadPage(i, ppn);
-
+						
 						if (IPTFull) {
 							int idx = findIdexOfPPN(ppn);
 							IPT.get(idx).ppn = ppn;
@@ -223,13 +252,15 @@ public class VMProcess extends UserProcess {
 						}else{ //ipt not full
 							IPTdata data = new IPTdata(ppn, vpn, false, this);
 							IPT.add(data);
+							//here
 						}
 						lock.release();
+						System.out.println("is this looping here?");
 						return true;
 					}
 				}
 			}
-		
+			
 			byte array[] = new byte[pageSize];
 
 			int paddr = ppn * pageSize;
@@ -237,6 +268,7 @@ public class VMProcess extends UserProcess {
 			pageTable[vpn].used = true;
 			pageTable[vpn].valid = true;
 			pageTable[vpn].dirty = false;
+			pageTable[vpn].ppn = ppn;
 			System.arraycopy(array, 0, memory, paddr, pageSize);
 			
 			if (IPTFull) {
@@ -422,5 +454,12 @@ public class VMProcess extends UserProcess {
 
 	private static int numOfSwap = 0;
 	
+	public void printPageTable(){
+		for(int i = 0; i < pageTable.length; i++){
+			System.out.println("index/vpn: " + i + " vpn/spn: " + pageTable[i].vpn +  " ppn: " +  pageTable[i].ppn 
+			+ " used: " + pageTable[i].used + " valid: " + pageTable[i].valid 
+			+ " dirty: " + pageTable[i].dirty + " readOnly " + pageTable[i].readOnly);
+		}
+	}
 
 }

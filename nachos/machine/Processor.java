@@ -225,6 +225,7 @@ public final class Processor {
 	 * @return the number of pages of physical memory.
 	 */
 	public int getNumPhysPages() {
+		//System.out.println(numPhysPages);
 		return numPhysPages;
 	}
 
