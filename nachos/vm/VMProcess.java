@@ -19,6 +19,7 @@ public class VMProcess extends UserProcess {
 	 */
 	public VMProcess() {
 		super();
+		cv = new Condition(cvLock);
 	}
 
 	/**
@@ -47,7 +48,6 @@ public class VMProcess extends UserProcess {
 		//return super.loadSections();
 			Lock lock = new Lock();
 			lock.acquire();
-			System.out.println("12313131221323213123");
 	
 			pageTable = new TranslationEntry[numPages];
 			for (int i = 0; i < numPages; i++) {
@@ -64,32 +64,27 @@ public class VMProcess extends UserProcess {
 	 * Release any resources allocated by <tt>loadSections()</tt>.
 	 */
 	protected void unloadSections() {
+		printPageTable();
+		printIPT();
+		System.out.println("The number of times swap is APPENDED " + numOfSwap);
+		System.out.println("The number of times swap is ACCESSED " + numOfSwapAcess);
+
 		Lock lock = new Lock();
 		lock.acquire();
-		System.out.println(UserKernel.freePPNs);
-		System.out.println("Page Table size ---------------");
-		printPageTable();
-		System.out.println(pageTable.length);
-		System.out.println(IPT.size());
-		System.out.println("IPT PPNSS ____________________________________________________");
-		
-		for (int j = 0; j < IPT.size(); j++) {
-			System.out.println(IPT.get(j).ppn + " " + IPT.get(j).process + " " +IPT.get(j).index );
-		}
-		System.out.println(IPT);
+		cvLock.acquire();
+
+		//printPageTable();
+
 		for (int i = 0; i < pageTable.length; i++) {
 			if(pageTable[i].valid == true) {
-				System.out.println("YIYIIASASDASDSDASADDSADA");
 				UserKernel.addFreePage(pageTable[i].ppn);
 				int idx = findIdexOfPPN(pageTable[i].ppn);
-				System.out.println("Page table ppn: " + pageTable[i].ppn);
-				System.out.println("INDEX: " + idx);
 				IPT.remove(idx);
-				//System.out.println(IPT.size());
+				cv.wake();
 			}
 		}
 		lock.release();
-		
+		cvLock.release();
 	}
 
 	/**
@@ -109,7 +104,6 @@ public class VMProcess extends UserProcess {
 					pageTable[vpn].vpn = vpn;
 					//pageTable[vpn].ppn = ppn;
 					loadPage(va);
-					System.out.println("Vpn: " + vpn);
 					break;
 			default:
 				super.handleException(cause);
@@ -117,52 +111,59 @@ public class VMProcess extends UserProcess {
 		}
 	}
 
-	protected int evictionClock(){
+	protected int evictionClock(Lock lock){
+		//cvLock.acquire();
 		int freePages = VMKernel.getNumFreePages();
 		if(freePages != 0){
-			System.out.println("-----------------------------HOPEFULLY!");
-			System.out.println("num of free pages is " + freePages);
+			//cvLock.release();
 			return -1;
 		} else{
-			//Lock lock = new Lock();
-			//Condition condition = new Condition(lock);
 			int counter = IPT.size();
 			int i = 0;
-
-			while(i < counter){
-				int index = IPT.get(evictPage).index;
-				VMProcess curProc = IPT.get(evictPage).process;
-				int ppn = curProc.pageTable[index].ppn;
-				Boolean used = curProc.pageTable[index].used;
-				Boolean pinned = IPT.get(evictPage).pinned;
-				if(used && !pinned)
-					curProc.pageTable[index].used = false;
-				else if (!used && !pinned){
-					curProc.pageTable[index].valid = false;
-					Boolean dirty = curProc.pageTable[index].dirty;
-					if(dirty){
-						byte[] memory = Machine.processor().getMemory();
-						byte[] buffer = new byte[pageSize];
-						System.arraycopy(memory, ppn * pageSize, buffer, 0, pageSize);
-						if(freeSwapList.size() != 0){ //if there's a gap in swap file, we replace instead of append
-							int free = freeSwapList.remove(0);
-							VMKernel.swapFile.write(free* pageSize , buffer, 0, pageSize); //overrite 
-							curProc.pageTable[index].vpn = free; 
-						} else{
-							int free = numOfSwap; //should really be endOfSwap namewise.... 
-							numOfSwap++;
-							VMKernel.swapFile.write(free* pageSize , buffer, 0, pageSize); //append
-							curProc.pageTable[index].vpn = free; 
+			while(true){
+				while(i < counter){
+					int index = IPT.get(evictPage).index;
+					VMProcess curProc = IPT.get(evictPage).process;
+					int ppn = curProc.pageTable[index].ppn;
+					Boolean used = curProc.pageTable[index].used;
+					Boolean pinned = IPT.get(evictPage).pinned;
+					if(used && !pinned)
+						curProc.pageTable[index].used = false;
+					else if (!used && !pinned){
+						curProc.pageTable[index].valid = false;
+						Boolean dirty = curProc.pageTable[index].dirty;
+						if(dirty){
+							numOfSwapAcess++;
+							byte[] memory = Machine.processor().getMemory();
+							byte[] buffer = new byte[pageSize];
+							System.arraycopy(memory, ppn * pageSize, buffer, 0, pageSize);
+							if(freeSwapList.size() != 0){ //if there's a gap in swap file, we replace instead of append
+								int free = freeSwapList.remove(0);
+								VMKernel.swapFile.write(free* pageSize , buffer, 0, pageSize); //overrite 
+								curProc.pageTable[index].vpn = free; 
+							} else{
+								int free = numOfSwap; //should really be endOfSwap namewise.... 
+								numOfSwap++;
+								VMKernel.swapFile.write(free* pageSize , buffer, 0, pageSize); //append
+								curProc.pageTable[index].vpn = free; 
+							}
 						}
+						evictPage = (evictPage + 1) % IPT.size();
+						//cvLock.release();
+						return ppn;
 					}
+					i++;
 					evictPage = (evictPage + 1) % IPT.size();
-					return ppn;
 				}
-				i++;
-				evictPage = (evictPage + 1) % IPT.size();
+				i = 0;
+				
+				lock.release();
+				//printPageTable();
+				//System.out.println(VMKernel.getNumFreePages() + "-----------------------------------");
+				if (allPinned())
+					cv.sleep();
+				lock.acquire();
 			}
-			System.out.println("HERE IS THE PROBLEM");
-			return -1; //condition variable
 		}
 	}
 
@@ -170,8 +171,8 @@ public class VMProcess extends UserProcess {
 		Lock lock = new Lock();
 		lock.acquire();
 
-		System.out.println("Yourasdasdas");
-		int removedPPN = evictionClock();
+		int removedPPN = evictionClock(lock);
+		//cvLock.release();
 
 		// load sections
 		Processor processor = Machine.processor();
@@ -304,6 +305,7 @@ public class VMProcess extends UserProcess {
 		Lib.assertTrue(offset >= 0 && length >= 0
 				&& offset + length <= data.length);
 
+		cvLock.acquire();
 		byte[] memory = Machine.processor().getMemory();
 
 		// Get VPN
@@ -317,13 +319,19 @@ public class VMProcess extends UserProcess {
 
 		while(remaining > 0){
 			int vpn = Processor.pageFromAddress(vaddr);
+			int ppn = pageTable[vpn].ppn;
+			int idx = findIdexOfPPN(ppn);
+			if (idx != -1)
+				IPT.get(idx).pinned = true;
 			int offse = Processor.offsetFromAddress(vaddr);
 			if(pageTable[vpn].valid == false){
 				this.loadPage(Processor.makeAddress(vpn, offse)); // same as just using vaddr
+				ppn = pageTable[vpn].ppn;
+				idx = findIdexOfPPN(ppn);
+				IPT.get(idx).pinned = true;
 			}
 
 			int vaoffset = Processor.offsetFromAddress(vaddr);
-			int ppn = pageTable[vpn].ppn;
 			int paddr = pageSize * ppn + vaoffset;
 	
 			//if(remaining >= pageSize)
@@ -333,14 +341,21 @@ public class VMProcess extends UserProcess {
 			int spaceAvail = Math.min(length, pageSize - vaoffset);
 			int leftToRead = Math.min(spaceAvail, remaining);
 			remaining -= leftToRead;
+			
 			System.arraycopy(memory, paddr, data, offset, leftToRead);
+			IPT.get(idx).pinned = false;
+			cv.wake();
 			totalRead += leftToRead;
 			vaddr += leftToRead;
 			offset += leftToRead;
 
-			if (vaddr < 0 || vaddr >= maxVA)
+			if (vaddr < 0 || vaddr >= maxVA){
+				cvLock.release();
 				return totalRead;
+			}
 		}
+
+		cvLock.release();
 		return totalRead;
 	}
 
@@ -373,9 +388,12 @@ public class VMProcess extends UserProcess {
 	public int writeVirtualMemory(int vaddr, byte[] data, int offset, int length) {
 		Lib.assertTrue(offset >= 0 && length >= 0
 				&& offset + length <= data.length);
+
+		cvLock.acquire();
 		byte[] memory = Machine.processor().getMemory();
 
 		// Get VPN
+
 		int maxVA = numPages * (pageSize + 1) - 1;
 		if (vaddr < 0 || vaddr >= maxVA)
 			return 0;
@@ -384,27 +402,41 @@ public class VMProcess extends UserProcess {
 		int curPageCount = 0;
 		int totalWrote = 0;
 
+		
 		while(remaining > 0){
 			int vpn = Processor.pageFromAddress(vaddr);
+			int ppn = pageTable[vpn].ppn;
+			int idx = findIdexOfPPN(ppn);
+			if (idx != -1)
+				IPT.get(idx).pinned = true;
 			int offse = Processor.offsetFromAddress(vaddr);
 			if(pageTable[vpn].valid == false){
 				this.loadPage(Processor.makeAddress(vpn, offse));
+				ppn = pageTable[vpn].ppn;
+				idx = findIdexOfPPN(ppn);
+				IPT.get(idx).pinned = true;
 			}
 			int vaoffset = Processor.offsetFromAddress(vaddr);
-			int ppn = pageTable[vpn].ppn;
+			
 			int paddr = pageSize * ppn + vaoffset;
 
 			int spaceAvail = Math.min(length, pageSize - vaoffset);
 			int leftToWrite = Math.min(spaceAvail, remaining);
 			remaining -= leftToWrite;
-			System.arraycopy(data, offset, memory, paddr, leftToWrite);	
+			
+			System.arraycopy(data, offset, memory, paddr, leftToWrite);
+			IPT.get(idx).pinned = false;
+			cv.wake();
 			totalWrote += leftToWrite;
 			offset += leftToWrite;
 			vaddr += leftToWrite;
 			
-			if (vaddr < 0 || vaddr >= maxVA)
+			if (vaddr < 0 || vaddr >= maxVA) {
+				cvLock.release();
 				return totalWrote;
+			}
 		}
+		cvLock.release();
 		return totalWrote;
 	}
 
@@ -441,7 +473,13 @@ public class VMProcess extends UserProcess {
 	private static ArrayList<IPTdata> IPT = new ArrayList<IPTdata>();
 
 	private static int numOfSwap = 0;
-	
+
+	private static int numOfSwapAcess = 0;
+
+	private Condition cv;
+
+	private Lock cvLock = new Lock();
+
 	public void printPageTable(){
 		for(int i = 0; i < pageTable.length; i++){
 			System.out.println("index/vpn: " + i + " vpn/spn: " + pageTable[i].vpn +  " ppn: " +  pageTable[i].ppn 
@@ -450,4 +488,18 @@ public class VMProcess extends UserProcess {
 		}
 	}
 
+	public boolean allPinned(){
+		for(int i = 0; i < IPT.size(); i++){
+			if(IPT.get(i).pinned == false)
+				return false;
+		}
+		return true;
+	}
+
+	public void printIPT(){
+		for(int i = 0; i < IPT.size(); i++){
+			System.out.println("index/vpn: " + IPT.get(i).index + " ppn: " + IPT.get(i).ppn 
+			+ " process: " + IPT.get(i).process + " pinned " + IPT.get(i).pinned);
+		}
+	}
 }

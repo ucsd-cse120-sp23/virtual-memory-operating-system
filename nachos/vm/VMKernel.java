@@ -14,6 +14,7 @@ public class VMKernel extends UserKernel {
 	 */
 	public VMKernel() {
 		super();
+
 	}
 
 	/**
@@ -22,6 +23,7 @@ public class VMKernel extends UserKernel {
 	public void initialize(String[] args) {
 		super.initialize(args);
 		swapFile = fileSystem.open("swap", true);
+
 	}
 
 	/**
@@ -51,4 +53,8 @@ public class VMKernel extends UserKernel {
 	private static final char dbgVM = 'v';
 
 	public static OpenFile swapFile;
+
+	//public static Condition condition;
+
+	//public static Lock conditionLock;
 }
