@@ -36,7 +36,6 @@ public class UserKernel extends ThreadedKernel {
 		for (int i = 0; i < numPhysPages; i++){
 			freePPNs.add(i);
 		}
-		System.out.println("GOD HELP ME " + freePPNs.size());
 	}
 
 	/**
